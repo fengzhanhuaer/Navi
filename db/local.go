@@ -22,15 +22,6 @@ var DB *sql.DB
 // 数据模型
 // ─────────────────────────────────────────────
 
-type SearchEngine struct {
-	ID         int64  `json:"id"`
-	Name       string `json:"name"`
-	URL        string `json:"url"`  // 含 {q} 占位符
-	Icon       string `json:"icon"` // emoji 或 URL
-	IsDefault  bool   `json:"is_default"`
-	OrderIndex int    `json:"order_index"`
-}
-
 type SiteGroup struct {
 	ID         int64     `json:"id"`
 	Name       string    `json:"name"`
@@ -94,15 +85,6 @@ func Init(dataDir string) error {
 
 func createTables() error {
 	_, err := DB.Exec(`
-		CREATE TABLE IF NOT EXISTS search_engines (
-			id          INTEGER PRIMARY KEY AUTOINCREMENT,
-			name        TEXT    NOT NULL,
-			url         TEXT    NOT NULL,
-			icon        TEXT    DEFAULT '',
-			is_default  INTEGER DEFAULT 0,
-			order_index INTEGER DEFAULT 0
-		);
-
 		CREATE TABLE IF NOT EXISTS site_groups (
 			id          INTEGER PRIMARY KEY AUTOINCREMENT,
 			name        TEXT    NOT NULL,
@@ -145,33 +127,15 @@ func createTables() error {
 
 func seedDefaults() error {
 	var count int
-	_ = DB.QueryRow("SELECT COUNT(*) FROM search_engines").Scan(&count)
-	if count == 0 {
-		engines := []struct{ name, url, icon string; def int }{
-			{"Google",     "https://www.google.com/search?q={q}", "🔍", 1},
-			{"百度",        "https://www.baidu.com/s?wd={q}",      "🔵", 0},
-			{"Bing",       "https://www.bing.com/search?q={q}",   "🟦", 0},
-			{"DuckDuckGo", "https://duckduckgo.com/?q={q}",       "🦆", 0},
-		}
-		for i, e := range engines {
-			_, err := DB.Exec(
-				"INSERT INTO search_engines (name,url,icon,is_default,order_index) VALUES (?,?,?,?,?)",
-				e.name, e.url, e.icon, e.def, i,
-			)
-			if err != nil {
-				return err
-			}
-		}
-	}
 
 	_ = DB.QueryRow("SELECT COUNT(*) FROM site_groups").Scan(&count)
 	if count == 0 {
 		res, _ := DB.Exec("INSERT INTO site_groups (name,icon,order_index) VALUES ('常用网站','⭐',0)")
 		gid, _ := res.LastInsertId()
 		defaults := []struct{ title, url string }{
-			{"GitHub",     "https://github.com"},
-			{"YouTube",    "https://youtube.com"},
-			{"Google",     "https://google.com"},
+			{"GitHub",  "https://github.com"},
+			{"YouTube", "https://youtube.com"},
+			{"Google",  "https://google.com"},
 		}
 		for i, s := range defaults {
 			DB.Exec("INSERT INTO sites (group_id,title,url,order_index) VALUES (?,?,?,?)", gid, s.title, s.url, i)
@@ -180,36 +144,7 @@ func seedDefaults() error {
 
 	DB.Exec("INSERT OR IGNORE INTO settings (key,value) VALUES ('theme','dark')")
 	DB.Exec("INSERT OR IGNORE INTO settings (key,value) VALUES ('background','gradient')")
-	DB.Exec("INSERT OR IGNORE INTO settings (key,value) VALUES ('search_engine_id','1')")
 	return nil
-}
-
-// ─────────────────────────────────────────────
-// 搜索引擎
-// ─────────────────────────────────────────────
-
-func GetSearchEngines() ([]SearchEngine, error) {
-	rows, err := DB.Query("SELECT id,name,url,icon,is_default,order_index FROM search_engines ORDER BY order_index")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var list []SearchEngine
-	for rows.Next() {
-		var e SearchEngine
-		var isDef int
-		rows.Scan(&e.ID, &e.Name, &e.URL, &e.Icon, &isDef, &e.OrderIndex)
-		e.IsDefault = isDef == 1
-		list = append(list, e)
-	}
-	return list, nil
-}
-
-func SetDefaultEngine(id int64) error {
-	tx, _ := DB.Begin()
-	tx.Exec("UPDATE search_engines SET is_default=0")
-	tx.Exec("UPDATE search_engines SET is_default=1 WHERE id=?", id)
-	return tx.Commit()
 }
 
 // ─────────────────────────────────────────────

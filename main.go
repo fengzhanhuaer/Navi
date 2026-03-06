@@ -125,19 +125,15 @@ func main() {
 	api := r.Group("/api")
 	{
 		api.GET("/data", func(c *gin.Context) {
-			engines, _ := db.GetSearchEngines()
 			groups, _ := db.GetGroups()
 			sites, _ := db.GetSites(0)
 			settings, _ := db.GetSettings()
 			c.JSON(200, gin.H{
-				"search_engines": engines,
-				"groups":         groups,
-				"sites":          sites,
-				"settings":       settings,
+				"groups":   groups,
+				"sites":    sites,
+				"settings": settings,
 			})
 		})
-		api.GET("/search-engines", handlers.GetSearchEngines)
-		api.PUT("/search-engines/:id/default", handlers.SetDefaultEngine)
 
 		api.GET("/groups", handlers.GetGroups)
 		api.POST("/groups", handlers.CreateGroup)

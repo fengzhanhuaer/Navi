@@ -17,14 +17,8 @@ async function request(method, path, body) {
 }
 
 const api = {
-    // 一次性加载所有初始化数据（search_engines/groups/sites/settings）
+    // 一次性加载所有初始化数据
     allData: () => request('GET', '/data'),
-
-    // 搜索引擎
-    searchEngines: {
-        list: () => request('GET', '/search-engines'),
-        setDefault: (id) => request('PUT', `/search-engines/${id}/default`),
-    },
 
     // 分组
     groups: {
