@@ -1,0 +1,25 @@
+## Git 忽略规则
+
+# 数据库文件
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# 编译产物
+dist/
+
+# 环境变量（含密钥，不提交）
+.env
+
+# Go 构建缓存
+vendor/
+
+# 开发时嵌入用的临时 frontend 副本（backend/frontend/，如有）
+backend/frontend/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db

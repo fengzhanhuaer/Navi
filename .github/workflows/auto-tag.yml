@@ -1,0 +1,62 @@
+# .github/workflows/auto-tag.yml
+# 每次推送到 main 分支时，自动将版本号末位 +1 并打 tag
+# 初始版本：0.1.0 → 0.1.1 → 0.1.2 → ...
+# 打完 tag 后会自动触发 release.yml 构建并发布
+
+name: Auto Tag
+
+on:
+  push:
+    branches:
+      - main
+    # 忽略以下文件变更（避免文档修改也触发版本递增）
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'scripts/**'
+
+permissions:
+  contents: write   # 需要写权限才能推送 tag
+
+jobs:
+  bump-tag:
+    name: Bump patch version & tag
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 拉取完整 git 历史，确保能读到所有 tag
+
+      - name: Get latest tag & bump patch
+        id: bump
+        run: |
+          # 获取最新的 semver tag（格式 vX.Y.Z），不存在则用初始值
+          LATEST=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          
+          if [ -z "$LATEST" ]; then
+            NEW_TAG="v0.1.0"
+          else
+            # 解析 major.minor.patch
+            VERSION="${LATEST#v}"          # 去掉 v 前缀
+            MAJOR=$(echo "$VERSION" | cut -d. -f1)
+            MINOR=$(echo "$VERSION" | cut -d. -f2)
+            PATCH=$(echo "$VERSION" | cut -d. -f3)
+            PATCH=$((PATCH + 1))
+            NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          
+          echo "Latest tag : ${LATEST:-none}"
+          echo "New tag    : $NEW_TAG"
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
+      - name: Create & push tag
+        env:
+          NEW_TAG: ${{ steps.bump.outputs.new_tag }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$NEW_TAG" -m "Auto release $NEW_TAG"
+          git push origin "$NEW_TAG"
+          echo "✅ Pushed tag: $NEW_TAG"

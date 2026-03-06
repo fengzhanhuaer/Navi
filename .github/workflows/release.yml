@@ -1,0 +1,103 @@
+# .github/workflows/release.yml
+# 推送 tag（如 v1.0.0）时自动构建多平台二进制并发布 GitHub Release
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Download dependencies
+        run: go mod tidy
+
+      - name: Build all platforms
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          mkdir -p dist
+          
+          echo "Building linux/amd64..."
+          GOOS=linux GOARCH=amd64 go build \
+            -ldflags="-s -w -X main.Version=${VERSION}" \
+            -o dist/navi-linux-amd64 .
+          
+          echo "Building linux/arm64..."
+          GOOS=linux GOARCH=arm64 go build \
+            -ldflags="-s -w -X main.Version=${VERSION}" \
+            -o dist/navi-linux-arm64 .
+          
+          echo "Building windows/amd64..."
+          GOOS=windows GOARCH=amd64 go build \
+            -ldflags="-s -w -X main.Version=${VERSION}" \
+            -o dist/navi-windows-amd64.exe .
+          
+          echo "Building darwin/amd64..."
+          GOOS=darwin GOARCH=amd64 go build \
+            -ldflags="-s -w -X main.Version=${VERSION}" \
+            -o dist/navi-darwin-amd64 .
+          
+          echo "Building darwin/arm64 (Apple Silicon)..."
+          GOOS=darwin GOARCH=arm64 go build \
+            -ldflags="-s -w -X main.Version=${VERSION}" \
+            -o dist/navi-darwin-arm64 .
+
+          ls -lh dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Navi ${{ steps.version.outputs.VERSION }}"
+          body: |
+            ## 🧭 Navi ${{ steps.version.outputs.VERSION }}
+
+            单文件可执行程序，内嵌前端，下载即用。
+
+            ### 下载
+
+            | 平台 | 文件 |
+            |------|------|
+            | Linux x64 | `navi-linux-amd64` |
+            | Linux ARM64 (树莓派等) | `navi-linux-arm64` |
+            | Windows x64 | `navi-windows-amd64.exe` |
+            | macOS Intel | `navi-darwin-amd64` |
+            | macOS Apple Silicon | `navi-darwin-arm64` |
+
+            ### ⭐ Linux 一键安装
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/fengzhanhuaer/Navi/main/scripts/install.sh | sudo bash
+            ```
+
+            ### Windows PowerShell
+            ```powershell
+            irm https://raw.githubusercontent.com/fengzhanhuaer/Navi/main/scripts/install.ps1 | iex
+            ```
+          files: |
+            dist/navi-linux-amd64
+            dist/navi-linux-arm64
+            dist/navi-windows-amd64.exe
+            dist/navi-darwin-amd64
+            dist/navi-darwin-arm64
+          draft: false
+          prerelease: false

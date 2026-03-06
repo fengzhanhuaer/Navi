@@ -1,0 +1,5 @@
+# 默认使用 CRLF（Windows）
+* text=auto
+
+# Shell 脚本强制 LF（在 Linux 服务器上执行需要 LF）
+scripts/*.sh text eol=lf
