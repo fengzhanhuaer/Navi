@@ -1,5 +1,5 @@
 /**
- * app.js — 个人导航页主逻辑
+ * app.js — 个人导航页主逻辑（含认证流程）
  */
 
 // ── 应用状态 ──────────────────────────────────
@@ -14,17 +14,31 @@ const state = {
 const $ = id => document.getElementById(id);
 
 const DOM = {
+    // 认证屏
+    authScreen: $('authScreen'),
+    authTitle: $('authTitle'),
+    authSubtitle: $('authSubtitle'),
+    authBtn: $('authBtn'),
+    authUsername: $('authUsername'),
+    authPassword: $('authPassword'),
+    authError: $('authError'),
+
+    // 主应用
+    appRoot: $('appRoot'),
     greeting: $('greeting'),
+    searchEngineSelector: $('searchEngineSelector'),
+    currentEngineBtn: $('currentEngineBtn'),
+    currentEngineIcon: $('currentEngineIcon'),
+    engineDropdown: $('engineDropdown'),
     searchInput: $('searchInput'),
     searchBtn: $('searchBtn'),
     bookmarksSection: $('bookmarksSection'),
     btnTheme: $('btnTheme'),
     iconSun: $('iconSun'),
     iconMoon: $('iconMoon'),
-    btnSync: $('btnSync'),
     btnSettings: $('btnSettings'),
+    btnLogout: $('btnLogout'),
     toastContainer: $('toastContainer'),
-    syncStatus: $('syncStatus'),
 
     // Site modal
     siteModalBackdrop: $('siteModalBackdrop'),
@@ -47,8 +61,6 @@ const DOM = {
     // Settings modal
     settingsModalBackdrop: $('settingsModalBackdrop'),
     settingBackground: $('settingBackground'),
-    d1StatusText: $('d1StatusText'),
-    syncLogs: $('syncLogs'),
 };
 
 // ── Toast 通知 ────────────────────────────────
@@ -64,6 +76,79 @@ function toast(msg, type = 'info', duration = 3000) {
         setTimeout(() => el.remove(), 300);
     }, duration);
 }
+
+// ── 认证：显示登录或注册界面 ──────────────────
+let authMode = 'register'; // 'register' | 'login'
+
+function showAuth(mode) {
+    authMode = mode;
+    DOM.authScreen.classList.remove('hidden');
+    DOM.appRoot.classList.add('hidden');
+    DOM.authError.textContent = '';
+    DOM.authUsername.value = '';
+    DOM.authPassword.value = '';
+
+    if (mode === 'register') {
+        DOM.authTitle.textContent = '欢迎使用 Navi';
+        DOM.authSubtitle.textContent = '首次使用，请先注册账号';
+        DOM.authBtn.textContent = '注 册';
+    } else {
+        DOM.authTitle.textContent = '欢迎回来';
+        DOM.authSubtitle.textContent = '请输入密码登录';
+        DOM.authBtn.textContent = '登 录';
+    }
+    setTimeout(() => DOM.authUsername.focus(), 100);
+}
+
+function showApp() {
+    DOM.authScreen.classList.add('hidden');
+    DOM.appRoot.classList.remove('hidden');
+}
+
+DOM.authBtn.addEventListener('click', async () => {
+    const username = DOM.authUsername.value.trim();
+    const password = DOM.authPassword.value;
+    DOM.authError.textContent = '';
+
+    if (!username || !password) {
+        DOM.authError.textContent = '用户名和密码不能为空';
+        return;
+    }
+
+    DOM.authBtn.disabled = true;
+    DOM.authBtn.textContent = '处理中...';
+
+    try {
+        let result;
+        if (authMode === 'register') {
+            result = await api.auth.register(username, password);
+        } else {
+            result = await api.auth.login(username, password);
+        }
+        localStorage.setItem('navi_token', result.token);
+        await loadApp();
+    } catch (err) {
+        DOM.authError.textContent = err.message;
+    } finally {
+        DOM.authBtn.disabled = false;
+        DOM.authBtn.textContent = authMode === 'register' ? '注 册' : '登 录';
+    }
+});
+
+// 回车也可提交
+DOM.authPassword.addEventListener('keydown', e => {
+    if (e.key === 'Enter') DOM.authBtn.click();
+});
+DOM.authUsername.addEventListener('keydown', e => {
+    if (e.key === 'Enter') DOM.authPassword.focus();
+});
+
+// ── 退出登录 ──────────────────────────────────
+DOM.btnLogout.addEventListener('click', () => {
+    if (!confirm('确定退出登录？')) return;
+    localStorage.removeItem('navi_token');
+    location.reload();
+});
 
 // ── 问候语 ────────────────────────────────────
 function updateGreeting() {
@@ -103,7 +188,50 @@ function getFaviconUrl(siteUrl) {
     } catch { return ''; }
 }
 
-// ── 搜索（固定使用 Google）────────────────────
+// ── 搜索引擎切换 ────────────────────────────────
+const ENGINES = {
+    google: { url: 'https://www.google.com/search?q=', icon: 'https://www.google.com/s2/favicons?domain=google.com&sz=32', name: 'Google' },
+    bing: { url: 'https://www.bing.com/search?q=', icon: 'https://www.google.com/s2/favicons?domain=bing.com&sz=32', name: 'Bing' },
+    baidu: { url: 'https://www.baidu.com/s?wd=', icon: 'https://www.google.com/s2/favicons?domain=baidu.com&sz=32', name: 'Baidu' }
+};
+
+let currentEngine = localStorage.getItem('navi_search_engine') || 'google';
+if (!ENGINES[currentEngine]) currentEngine = 'google';
+
+function setEngine(engineKey) {
+    currentEngine = engineKey;
+    localStorage.setItem('navi_search_engine', engineKey);
+    DOM.currentEngineIcon.src = ENGINES[engineKey].icon;
+    DOM.currentEngineIcon.alt = ENGINES[engineKey].name;
+    DOM.engineDropdown.classList.add('hidden');
+    DOM.searchInput.focus();
+}
+
+// 初始化搜索引擎图标
+setEngine(currentEngine);
+
+// 切换下拉菜单
+DOM.currentEngineBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    DOM.engineDropdown.classList.toggle('hidden');
+});
+
+// 选择引擎
+DOM.engineDropdown.querySelectorAll('.engine-option').forEach(opt => {
+    opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setEngine(opt.dataset.engine);
+    });
+});
+
+// 点击外部关闭下拉菜单
+document.addEventListener('click', e => {
+    if (!DOM.searchEngineSelector.contains(e.target)) {
+        DOM.engineDropdown.classList.add('hidden');
+    }
+});
+
+// ── 搜索 ──────────────────────────────────────
 function doSearch() {
     const q = DOM.searchInput.value.trim();
     if (!q) return;
@@ -111,13 +239,12 @@ function doSearch() {
         window.open(/^https?:\/\//i.test(q) ? q : 'https://' + q, '_blank');
         return;
     }
-    window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, '_blank');
+    window.open(ENGINES[currentEngine].url + encodeURIComponent(q), '_blank');
 }
 
 DOM.searchBtn.addEventListener('click', doSearch);
 DOM.searchInput.addEventListener('keydown', e => e.key === 'Enter' && doSearch());
 
-// 快捷键 / 聚焦搜索框
 document.addEventListener('keydown', e => {
     if (e.key === '/' && document.activeElement !== DOM.searchInput) {
         e.preventDefault();
@@ -177,6 +304,70 @@ function renderBookmarks() {
     }).join('');
 
     bindBookmarkEvents();
+    initSortable();
+}
+
+// ── 拖拽排序逻辑 ──────────────────────────────────
+function initSortable() {
+    if (typeof Sortable === 'undefined') return;
+
+    // 1. 分组拖拽
+    Sortable.create(DOM.bookmarksSection, {
+        animation: 150,
+        handle: '.group-header', // 仅可通过标题栏拖拽
+        ghostClass: 'sortable-ghost',
+        onEnd: async function () {
+            const groupCards = DOM.bookmarksSection.querySelectorAll('.group-card');
+            const items = Array.from(groupCards).map((el, index) => ({
+                id: parseInt(el.dataset.groupId),
+                order: index
+            }));
+            
+            // 乐观更新
+            items.forEach(item => {
+                const g = state.groups.find(x => x.id === item.id);
+                if (g) g.order_index = item.order;
+            });
+            state.groups.sort((a, b) => a.order_index - b.order_index);
+
+            try {
+                await api.groups.reorder(items);
+            } catch (e) {
+                toast('分组排序保存失败: ' + e.message, 'error');
+                loadData();
+            }
+        }
+    });
+
+    // 2. 书签网站拖拽
+    document.querySelectorAll('.sites-grid').forEach(grid => {
+        Sortable.create(grid, {
+            animation: 150,
+            filter: '.add-site-card',
+            ghostClass: 'sortable-ghost',
+            onEnd: async function () {
+                const siteCards = grid.querySelectorAll('.site-card');
+                const items = Array.from(siteCards).map((el, index) => ({
+                    id: parseInt(el.dataset.siteId),
+                    order: index
+                }));
+
+                // 乐观更新
+                items.forEach(item => {
+                    const s = state.sites.find(x => x.id === item.id);
+                    if (s) s.order_index = item.order;
+                });
+                state.sites.sort((a, b) => a.order_index - b.order_index);
+                
+                try {
+                    await api.sites.reorder(items);
+                } catch (e) {
+                    toast('书签排序保存失败: ' + e.message, 'error');
+                    loadData();
+                }
+            }
+        });
+    });
 }
 
 function bindBookmarkEvents() {
@@ -332,24 +523,10 @@ $('siteModalClose').addEventListener('click', closeSiteModal);
 $('siteModalCancel').addEventListener('click', closeSiteModal);
 DOM.siteModalBackdrop.addEventListener('click', e => { if (e.target === DOM.siteModalBackdrop) closeSiteModal(); });
 
-// ── 设置面板 ──────────────────────────────────
-DOM.btnSettings.addEventListener('click', async () => {
+// ── 外观设置面板 ──────────────────────────────
+DOM.btnSettings.addEventListener('click', () => {
     DOM.settingsModalBackdrop.classList.remove('hidden');
     DOM.settingBackground.value = state.settings.background || 'gradient';
-    try {
-        const { status } = await api.sync.status();
-        DOM.d1StatusText.textContent = { ok: '✅ 已连接', not_configured: '⚠️ 未配置' }[status] || '❌ 错误';
-        DOM.d1StatusText.className = `status-badge ${status}`;
-    } catch { DOM.d1StatusText.textContent = '❌ 请求失败'; DOM.d1StatusText.className = 'status-badge error'; }
-    try {
-        const logs = await api.sync.logs();
-        DOM.syncLogs.innerHTML = logs.length
-            ? logs.map(l => `<div class="sync-log-item">
-          <span class="log-status ${l.status}">${l.status}</span>
-          <span>${l.synced_at}</span><span>${l.message}</span>
-        </div>`).join('')
-            : '<div style="padding:10px;color:var(--text-muted);">暂无同步记录</div>';
-    } catch { }
 });
 
 DOM.settingBackground.addEventListener('change', async e => {
@@ -363,36 +540,12 @@ DOM.settingsModalBackdrop.addEventListener('click', e => {
     if (e.target === DOM.settingsModalBackdrop) DOM.settingsModalBackdrop.classList.add('hidden');
 });
 
-$('btnManualSync').addEventListener('click', async () => {
-    try { await api.sync.push(); toast('同步成功！', 'success'); }
-    catch (err) { toast('同步失败: ' + err.message, 'error'); }
-});
-
-$('btnRestoreD1').addEventListener('click', async () => {
-    if (!confirm('此操作将用 D1 数据覆盖本地，确定？')) return;
-    try { await api.sync.restore(); toast('恢复成功，重新加载...', 'success'); setTimeout(() => location.reload(), 1500); }
-    catch (err) { toast('恢复失败: ' + err.message, 'error'); }
-});
-
-// ── D1 同步按钮（顶栏）────────────────────────
-DOM.btnSync.addEventListener('click', async () => {
-    DOM.btnSync.classList.add('syncing');
-    DOM.syncStatus.textContent = '同步中...';
-    try {
-        const result = await api.sync.push();
-        toast(`同步成功 ✅`, 'success');
-        DOM.syncStatus.textContent = `上次同步: ${new Date().toLocaleTimeString()}`;
-    } catch (err) {
-        toast('同步失败: ' + err.message, 'error');
-        DOM.syncStatus.textContent = '同步失败';
-    } finally { DOM.btnSync.classList.remove('syncing'); }
-});
-
 // ── 背景 ──────────────────────────────────────
 function applyBackground(bg) { document.body.dataset.bg = bg; }
 
-// ── 初始化 ────────────────────────────────────
-async function init() {
+// ── 加载主应用数据 ────────────────────────────
+async function loadApp() {
+    showApp();
     updateGreeting();
     setInterval(updateGreeting, 60_000);
     try {
@@ -404,9 +557,34 @@ async function init() {
         applyBackground(state.settings.background || 'gradient');
         renderBookmarks();
     } catch (err) {
-        console.error('Init failed:', err);
-        toast('加载失败，请检查后端服务', 'error', 6000);
+        console.error('Load failed:', err);
+        toast('加载数据失败，请刷新重试', 'error', 6000);
         renderBookmarks();
+    }
+}
+
+// ── 初始化入口 ────────────────────────────────
+async function init() {
+    // 先检查注册状态
+    const token = localStorage.getItem('navi_token');
+
+    try {
+        const { registered } = await api.auth.status();
+
+        if (token) {
+            // 有 token → 直接尝试加载（若 token 过期 api.js 会自动 reload）
+            await loadApp();
+        } else if (!registered) {
+            // 还没有用户 → 显示注册页
+            showAuth('register');
+        } else {
+            // 已有用户但没 token → 显示登录页
+            showAuth('login');
+        }
+    } catch (err) {
+        // 连不上服务器
+        toast('无法连接到服务器', 'error', 8000);
+        console.error(err);
     }
 }
 

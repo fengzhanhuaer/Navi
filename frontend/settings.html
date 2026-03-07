@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Navi — Cloudflare D1 设置</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body class="dark">
+  <div class="bg-layer"></div>
+  <div class="bg-overlay"></div>
+
+  <!-- 顶部工具栏 -->
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <span class="logo">🧭 Navi</span>
+    </div>
+    <div class="top-bar-right">
+      <a href="/" class="icon-btn" title="返回主页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 5l-7 7 7 7" />
+        </svg>
+      </a>
+    </div>
+  </header>
+
+  <div class="settings-page">
+    <div class="settings-page-header">
+      <h1 class="settings-page-title">☁️ Cloudflare D1 设置</h1>
+    </div>
+
+    <!-- 连接状态 -->
+    <div class="settings-card">
+      <h3>📡 连接状态</h3>
+      <div class="setting-row">
+        <span class="setting-label">D1 连接</span>
+        <span class="setting-value"><span id="d1StatusBadge" class="status-badge">检测中...</span></span>
+      </div>
+      <div class="setting-row" id="rowAccountId" style="display:none">
+        <span class="setting-label">Account ID</span>
+        <span class="setting-value" id="d1AccountId" style="font-family:monospace;font-size:.82rem;"></span>
+      </div>
+      <div class="setting-row" id="rowDatabaseId" style="display:none">
+        <span class="setting-label">数据库名</span>
+        <span class="setting-value" id="d1DatabaseName" style="font-family:monospace;font-size:.82rem;">navi</span>
+      </div>
+    </div>
+
+    <!-- API Key 配置 -->
+    <div class="settings-card">
+      <h3>🔑 配置 API Key</h3>
+      <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px;">
+        输入你的 Cloudflare API Token，系统将自动匹配账户并在 D1 中查找或创建名为
+        <code style="background:var(--surface-active);padding:2px 6px;border-radius:4px;">navi</code>
+        的数据库。<br/>
+        <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank"
+          style="color:var(--accent-1);font-size:.82rem;text-decoration:none;">
+          → 如何获取 API Token？
+        </a>
+      </p>
+      <div class="auth-field" style="margin-bottom:14px;">
+        <label for="apiTokenInput">Cloudflare API Token</label>
+        <input type="password" id="apiTokenInput" placeholder="粘贴你的 API Token" autocomplete="off" />
+      </div>
+      <div id="configureError" style="font-size:.83rem;color:#ef4444;min-height:20px;margin-bottom:8px;"></div>
+      <div class="settings-actions">
+        <button class="btn-primary" id="btnConfigure">🔗 连接 D1</button>
+        <button class="btn-secondary" id="btnRevealToken" title="显示/隐藏" style="width:38px;padding:0;">👁</button>
+      </div>
+    </div>
+
+    <!-- 同步操作（始终显示，未配置时禁用） -->
+    <div class="settings-card">
+      <h3>🔄 数据同步</h3>
+      <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px;" id="syncDesc">
+        配置 D1 后，可手动将本地数据推送到 Cloudflare D1，或从 D1 拉取数据到本地。
+      </p>
+      <div class="settings-actions">
+        <button class="btn-primary" id="btnSync" disabled>⬆️ 推送到 D1</button>
+        <button class="btn-danger" id="btnRestore" disabled>⬇️ 从 D1 拉取</button>
+      </div>
+      <div id="syncHint" style="font-size:.82rem;color:var(--text-muted);margin-top:10px;">请先配置 API Token 以启用同步功能</div>
+    </div>
+
+    <!-- 同步日志 -->
+    <div class="settings-card">
+      <h3>📋 同步日志</h3>
+      <div class="settings-logs" id="syncLogs">
+        <div style="padding:12px 16px;color:var(--text-muted);">暂无记录</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="js/api.js"></script>
+  <script>
+    if (!localStorage.getItem('navi_token')) {
+      location.href = '/';
+    }
+
+    function toast(msg, type = 'info', duration = 3500) {
+      const el = document.createElement('div');
+      el.className = `toast ${type}`;
+      el.textContent = msg;
+      document.getElementById('toastContainer').appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity .3s';
+        setTimeout(() => el.remove(), 300);
+      }, duration);
+    }
+
+    // 显示/隐藏 token
+    document.getElementById('btnRevealToken').addEventListener('click', () => {
+      const inp = document.getElementById('apiTokenInput');
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    });
+
+    async function loadStatus() {
+      try {
+        const s = await api.sync.status();
+        const badge = document.getElementById('d1StatusBadge');
+        if (s.status === 'ok') {
+          badge.textContent = '✅ 已连接';
+          badge.className = 'status-badge ok';
+          // 启用同步按钮
+          document.getElementById('btnSync').disabled = false;
+          document.getElementById('btnRestore').disabled = false;
+          document.getElementById('syncHint').textContent = '';
+          document.getElementById('syncDesc').textContent = '可手动推送本地数据到 D1，或从 D1 拉取最新数据覆盖本地。';
+          if (s.account_id) {
+            document.getElementById('d1AccountId').textContent = s.account_id;
+            document.getElementById('rowAccountId').style.display = '';
+            document.getElementById('rowDatabaseId').style.display = '';
+          }
+        } else if (s.status === 'not_configured') {
+          badge.textContent = '⚠️ 未配置';
+          badge.className = 'status-badge not_configured';
+        } else {
+          badge.textContent = '❌ 连接错误';
+          badge.className = 'status-badge error';
+        }
+      } catch (e) {
+        document.getElementById('d1StatusBadge').textContent = '❌ 请求失败';
+        document.getElementById('d1StatusBadge').className = 'status-badge error';
+      }
+    }
+
+    async function loadLogs() {
+      try {
+        const logs = await api.sync.logs();
+        const el = document.getElementById('syncLogs');
+        if (!logs || logs.length === 0) {
+          el.innerHTML = '<div style="padding:12px 16px;color:var(--text-muted);">暂无同步记录</div>';
+          return;
+        }
+        el.innerHTML = logs.map(l => `
+          <div class="log-item">
+            <span class="${l.status === 'ok' ? 'ls-ok' : 'ls-error'}">${l.status}</span>
+            <span>${l.synced_at}</span>
+            <span style="flex:1">${l.message}</span>
+          </div>`).join('');
+      } catch { }
+    }
+
+    document.getElementById('btnConfigure').addEventListener('click', async () => {
+      const token = document.getElementById('apiTokenInput').value.trim();
+      const errEl = document.getElementById('configureError');
+      errEl.textContent = '';
+      if (!token) { errEl.textContent = '请输入 API Token'; return; }
+
+      const btn = document.getElementById('btnConfigure');
+      btn.disabled = true;
+      btn.textContent = '连接中...';
+      try {
+        const res = await api.d1.configure(token);
+        toast(res.message || '配置成功！', 'success');
+        document.getElementById('apiTokenInput').value = '';
+        await loadStatus();
+        await loadLogs();
+      } catch (e) {
+        errEl.textContent = e.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🔗 连接 D1';
+      }
+    });
+
+    document.getElementById('btnSync') && document.getElementById('btnSync').addEventListener('click', async () => {
+      try {
+        await api.sync.push();
+        toast('同步成功！', 'success');
+        loadLogs();
+      } catch (e) { toast('同步失败: ' + e.message, 'error'); }
+    });
+
+    document.getElementById('btnRestore').addEventListener('click', async () => {
+      if (!confirm('此操作将用 D1 数据覆盖本地，确定继续？')) return;
+      try {
+        await api.sync.restore();
+        toast('恢复成功，即将返回主页...', 'success');
+        setTimeout(() => location.href = '/', 1500);
+      } catch (e) { toast('恢复失败: ' + e.message, 'error'); }
+    });
+
+    loadStatus();
+    loadLogs();
+  </script>
+</body>
+
+</html>

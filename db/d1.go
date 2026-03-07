@@ -29,22 +29,177 @@ type D1HTTPClient struct {
 	client *http.Client
 }
 
-// NewD1Client 从环境变量创建 D1 客户端
+// NewD1Client 优先从 SQLite settings 读取配置，回退到环境变量
 func NewD1Client() *D1HTTPClient {
-	return &D1HTTPClient{
-		cfg: D1Config{
-			AccountID:  os.Getenv("CF_ACCOUNT_ID"),
-			DatabaseID: os.Getenv("CF_D1_DATABASE_ID"),
-			APIToken:   os.Getenv("CF_API_TOKEN"),
-		},
-		client: &http.Client{Timeout: 30 * time.Second},
+	c := &D1HTTPClient{client: &http.Client{Timeout: 30 * time.Second}}
+	c.reloadConfig()
+	return c
+}
+
+// reloadConfig 从 settings 表（或 env）重新加载凭证
+func (c *D1HTTPClient) reloadConfig() {
+	token, _ := getSettingVal("cf_api_token")
+	accountID, _ := getSettingVal("cf_account_id")
+	dbID, _ := getSettingVal("cf_database_id")
+
+	// 回退到环境变量
+	if token == "" {
+		token = os.Getenv("CF_API_TOKEN")
 	}
+	if accountID == "" {
+		accountID = os.Getenv("CF_ACCOUNT_ID")
+	}
+	if dbID == "" {
+		dbID = os.Getenv("CF_D1_DATABASE_ID")
+	}
+
+	c.cfg = D1Config{AccountID: accountID, DatabaseID: dbID, APIToken: token}
+}
+
+// getSettingVal 直接查 settings 表，避免循环依赖
+func getSettingVal(key string) (string, error) {
+	if DB == nil {
+		return "", nil
+	}
+	var v string
+	err := DB.QueryRow("SELECT value FROM settings WHERE key=?", key).Scan(&v)
+	return v, err
 }
 
 func (c *D1HTTPClient) IsConfigured() bool {
+	c.reloadConfig() // 每次判断前重新加载，支持运行时配置
 	return c.cfg.AccountID != "" &&
 		c.cfg.DatabaseID != "" &&
 		c.cfg.APIToken != ""
+}
+
+// ─────────────────────────────────────────────
+// Cloudflare API 自动发现（账户 + 数据库）
+// ─────────────────────────────────────────────
+
+// cfAPIGet 调 Cloudflare REST API（GET）
+func cfAPIGet(token, path string) (map[string]any, error) {
+	req, _ := http.NewRequest("GET", "https://api.cloudflare.com/client/v4"+path, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var result map[string]any
+	json.Unmarshal(body, &result)
+	if success, _ := result["success"].(bool); !success {
+		errs, _ := result["errors"].([]any)
+		if len(errs) > 0 {
+			if e, ok := errs[0].(map[string]any); ok {
+				return nil, fmt.Errorf("CF API: %v", e["message"])
+			}
+		}
+		return nil, fmt.Errorf("CF API returned success=false")
+	}
+	return result, nil
+}
+
+// cfAPIPost 调 Cloudflare REST API（POST）
+func cfAPIPost(token, path string, payload any) (map[string]any, error) {
+	body, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("POST", "https://api.cloudflare.com/client/v4"+path, bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(resp.Body)
+	var result map[string]any
+	json.Unmarshal(data, &result)
+	if success, _ := result["success"].(bool); !success {
+		errs, _ := result["errors"].([]any)
+		if len(errs) > 0 {
+			if e, ok := errs[0].(map[string]any); ok {
+				return nil, fmt.Errorf("CF API: %v", e["message"])
+			}
+		}
+		return nil, fmt.Errorf("CF API returned success=false")
+	}
+	return result, nil
+}
+
+// ConfigureWithAPIKey 用 API Key 自动发现账户和数据库，保存到 settings 表
+// dbName = "Navi" + username（不存在则创建）
+func ConfigureWithAPIKey(apiToken, dbName string) error {
+	// 1. 获取账户列表（取第一个）
+	resp, err := cfAPIGet(apiToken, "/accounts?per_page=1")
+	if err != nil {
+		return fmt.Errorf("获取账户失败: %w", err)
+	}
+	resultArr, _ := resp["result"].([]any)
+	if len(resultArr) == 0 {
+		return fmt.Errorf("未找到 Cloudflare 账户，请确认 API Key 权限包含 Account:Read")
+	}
+	account, _ := resultArr[0].(map[string]any)
+	accountID, _ := account["id"].(string)
+	if accountID == "" {
+		return fmt.Errorf("无法获取账户 ID")
+	}
+	log.Printf("[D1] Account ID: %s", accountID)
+
+	// 2. 查找同名数据库
+	dbID := ""
+	listResp, err := cfAPIGet(apiToken, fmt.Sprintf("/accounts/%s/d1/database?per_page=100", accountID))
+	if err == nil {
+		if dbs, ok := listResp["result"].([]any); ok {
+			for _, d := range dbs {
+				dm, _ := d.(map[string]any)
+				if name, _ := dm["name"].(string); strings.EqualFold(name, dbName) {
+					dbID, _ = dm["uuid"].(string)
+					log.Printf("[D1] Found existing database: %s (%s)", dbName, dbID)
+					break
+				}
+			}
+		}
+	}
+
+	// 3. 不存在则创建
+	if dbID == "" {
+		log.Printf("[D1] Creating database: %s", dbName)
+		createResp, err := cfAPIPost(apiToken,
+			fmt.Sprintf("/accounts/%s/d1/database", accountID),
+			map[string]string{"name": dbName},
+		)
+		if err != nil {
+			return fmt.Errorf("创建数据库失败: %w", err)
+		}
+		if r, ok := createResp["result"].(map[string]any); ok {
+			dbID, _ = r["uuid"].(string)
+		}
+		if dbID == "" {
+			return fmt.Errorf("创建数据库成功但未获取到 ID")
+		}
+		log.Printf("[D1] Created database: %s (%s)", dbName, dbID)
+	}
+
+	// 4. 保存到 settings 表（不标记 dirty，这些配置不同步到 D1）
+	for _, kv := range [][2]string{
+		{"cf_api_token", apiToken},
+		{"cf_account_id", accountID},
+		{"cf_database_id", dbID},
+	} {
+		if _, err := DB.Exec(
+			"INSERT OR REPLACE INTO settings (key, value, updated_at, dirty) VALUES (?,?,datetime('now'),0)",
+			kv[0], kv[1],
+		); err != nil {
+			return fmt.Errorf("保存配置失败: %w", err)
+		}
+	}
+
+	log.Printf("[D1] Configured: account=%s db=%s", accountID, dbID)
+	return nil
 }
 
 // d1Request 向 D1 API 发送 SQL 查询
@@ -89,9 +244,9 @@ type d1Statement struct {
 }
 
 type d1Response struct {
-	Success bool        `json:"success"`
-	Errors  []d1Error   `json:"errors"`
-	Result  []d1Result  `json:"result"`
+	Success bool       `json:"success"`
+	Errors  []d1Error  `json:"errors"`
+	Result  []d1Result `json:"result"`
 }
 
 type d1Error struct {
@@ -108,7 +263,6 @@ type d1Result struct {
 // D1 表初始化
 // ─────────────────────────────────────────────
 
-// InitD1Tables 在 D1 中创建表（首次使用时调用）
 func (c *D1HTTPClient) InitD1Tables() error {
 	if !c.IsConfigured() {
 		return fmt.Errorf("D1 not configured")
@@ -148,20 +302,20 @@ func (c *D1HTTPClient) PushDirtyData(data *DirtyData) error {
 
 	var stmts []d1Statement
 
-	// upsert groups
 	for _, g := range data.Groups {
-		c := 0
-		if g.Collapsed { c = 1 }
+		col := 0
+		if g.Collapsed {
+			col = 1
+		}
 		stmts = append(stmts, d1Statement{
 			SQL: `INSERT OR REPLACE INTO site_groups
 				(id,name,icon,order_index,collapsed,created_at,updated_at)
 				VALUES (?,?,?,?,?,?,?)`,
-			Params: []any{g.ID, g.Name, g.Icon, g.OrderIndex, c,
+			Params: []any{g.ID, g.Name, g.Icon, g.OrderIndex, col,
 				g.CreatedAt.Format(time.DateTime), g.UpdatedAt.Format(time.DateTime)},
 		})
 	}
 
-	// upsert sites
 	for _, s := range data.Sites {
 		stmts = append(stmts, d1Statement{
 			SQL: `INSERT OR REPLACE INTO sites
@@ -172,7 +326,6 @@ func (c *D1HTTPClient) PushDirtyData(data *DirtyData) error {
 		})
 	}
 
-	// upsert settings
 	for _, s := range data.Settings {
 		stmts = append(stmts, d1Statement{
 			SQL:    `INSERT OR REPLACE INTO settings (key,value,updated_at) VALUES (?,?,datetime('now'))`,
@@ -181,21 +334,12 @@ func (c *D1HTTPClient) PushDirtyData(data *DirtyData) error {
 	}
 
 	if len(stmts) == 0 {
-		return nil // 无需同步
+		return nil
 	}
 
-	// D1 HTTP API 每次最多 100 条语句，分批发送
-	batchSize := 100
-	for i := 0; i < len(stmts); i += batchSize {
-		end := i + batchSize
-		if end > len(stmts) { end = len(stmts) }
-		batch := stmts[i:end]
-
-		// 逐条发送（D1 免费版不支持批量事务）
-		for _, stmt := range batch {
-			if _, err := c.d1Request([]d1Statement{stmt}); err != nil {
-				return fmt.Errorf("push to D1: %w", err)
-			}
+	for _, stmt := range stmts {
+		if _, err := c.d1Request([]d1Statement{stmt}); err != nil {
+			return fmt.Errorf("push to D1: %w", err)
 		}
 	}
 
@@ -215,51 +359,80 @@ func (c *D1HTTPClient) PullAll() (*DirtyData, error) {
 
 	data := &DirtyData{}
 
-	// 拉取分组
 	resp, err := c.d1Request([]d1Statement{
 		{SQL: "SELECT id,name,icon,order_index,collapsed,created_at,updated_at FROM site_groups ORDER BY order_index"},
 	})
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	if len(resp.Result) > 0 {
 		for _, row := range resp.Result[0].Results {
 			g := SiteGroup{}
-			if v, ok := row["id"].(float64); ok { g.ID = int64(v) }
-			if v, ok := row["name"].(string); ok { g.Name = v }
-			if v, ok := row["icon"].(string); ok { g.Icon = v }
-			if v, ok := row["order_index"].(float64); ok { g.OrderIndex = int(v) }
-			if v, ok := row["collapsed"].(float64); ok { g.Collapsed = v == 1 }
+			if v, ok := row["id"].(float64); ok {
+				g.ID = int64(v)
+			}
+			if v, ok := row["name"].(string); ok {
+				g.Name = v
+			}
+			if v, ok := row["icon"].(string); ok {
+				g.Icon = v
+			}
+			if v, ok := row["order_index"].(float64); ok {
+				g.OrderIndex = int(v)
+			}
+			if v, ok := row["collapsed"].(float64); ok {
+				g.Collapsed = v == 1
+			}
 			data.Groups = append(data.Groups, g)
 		}
 	}
 
-	// 拉取网站
 	resp2, err := c.d1Request([]d1Statement{
 		{SQL: "SELECT id,group_id,title,url,icon,order_index FROM sites ORDER BY group_id,order_index"},
 	})
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	if len(resp2.Result) > 0 {
 		for _, row := range resp2.Result[0].Results {
 			s := Site{}
-			if v, ok := row["id"].(float64); ok { s.ID = int64(v) }
-			if v, ok := row["group_id"].(float64); ok { s.GroupID = int64(v) }
-			if v, ok := row["title"].(string); ok { s.Title = v }
-			if v, ok := row["url"].(string); ok { s.URL = v }
-			if v, ok := row["icon"].(string); ok { s.Icon = v }
-			if v, ok := row["order_index"].(float64); ok { s.OrderIndex = int(v) }
+			if v, ok := row["id"].(float64); ok {
+				s.ID = int64(v)
+			}
+			if v, ok := row["group_id"].(float64); ok {
+				s.GroupID = int64(v)
+			}
+			if v, ok := row["title"].(string); ok {
+				s.Title = v
+			}
+			if v, ok := row["url"].(string); ok {
+				s.URL = v
+			}
+			if v, ok := row["icon"].(string); ok {
+				s.Icon = v
+			}
+			if v, ok := row["order_index"].(float64); ok {
+				s.OrderIndex = int(v)
+			}
 			data.Sites = append(data.Sites, s)
 		}
 	}
 
-	// 拉取配置
 	resp3, err := c.d1Request([]d1Statement{
 		{SQL: "SELECT key,value FROM settings"},
 	})
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	if len(resp3.Result) > 0 {
 		for _, row := range resp3.Result[0].Results {
 			s := Setting{}
-			if v, ok := row["key"].(string); ok { s.Key = v }
-			if v, ok := row["value"].(string); ok { s.Value = v }
+			if v, ok := row["key"].(string); ok {
+				s.Key = v
+			}
+			if v, ok := row["value"].(string); ok {
+				s.Value = v
+			}
 			data.Settings = append(data.Settings, s)
 		}
 	}
@@ -275,7 +448,9 @@ func (c *D1HTTPClient) PullAll() (*DirtyData, error) {
 
 func RestoreFromD1Data(data *DirtyData) error {
 	tx, err := DB.Begin()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer tx.Rollback()
 
 	tx.Exec("DELETE FROM sites")
@@ -283,11 +458,13 @@ func RestoreFromD1Data(data *DirtyData) error {
 	tx.Exec("DELETE FROM settings")
 
 	for _, g := range data.Groups {
-		c := 0
-		if g.Collapsed { c = 1 }
+		col := 0
+		if g.Collapsed {
+			col = 1
+		}
 		tx.Exec(
 			"INSERT OR REPLACE INTO site_groups (id,name,icon,order_index,collapsed) VALUES (?,?,?,?,?)",
-			g.ID, g.Name, g.Icon, g.OrderIndex, c,
+			g.ID, g.Name, g.Icon, g.OrderIndex, col,
 		)
 	}
 
@@ -305,8 +482,9 @@ func RestoreFromD1Data(data *DirtyData) error {
 	return tx.Commit()
 }
 
-// GetD1Status 测试 D1 连接是否正常
+// GetD1Status 测试 D1 连接是否正常，同时返回配置信息
 func (c *D1HTTPClient) GetD1Status() (string, error) {
+	c.reloadConfig()
 	if !c.IsConfigured() {
 		return "not_configured", nil
 	}
@@ -318,6 +496,8 @@ func (c *D1HTTPClient) GetD1Status() (string, error) {
 		return "ok", nil
 	}
 	msgs := make([]string, len(resp.Errors))
-	for i, e := range resp.Errors { msgs[i] = e.Message }
-	return "error", fmt.Errorf(strings.Join(msgs, "; "))
+	for i, e := range resp.Errors {
+		msgs[i] = e.Message
+	}
+	return "error", fmt.Errorf("%s", strings.Join(msgs, "; "))
 }

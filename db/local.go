@@ -48,6 +48,12 @@ type Setting struct {
 	Value string `json:"value"`
 }
 
+type User struct {
+	ID           int64  `json:"id"`
+	Username     string `json:"username"`
+	PasswordHash string `json:"-"`
+}
+
 // DirtyData 用于 D1 同步
 type DirtyData struct {
 	Groups   []SiteGroup       `json:"groups"`
@@ -121,8 +127,45 @@ func createTables() error {
 			status    TEXT,
 			message   TEXT
 		);
+
+		CREATE TABLE IF NOT EXISTS users (
+			id            INTEGER PRIMARY KEY AUTOINCREMENT,
+			username      TEXT NOT NULL UNIQUE,
+			password_hash TEXT NOT NULL,
+			created_at    TEXT DEFAULT (datetime('now'))
+		);
 	`)
 	return err
+}
+
+// ─────────────────────────────────────────────
+// 用户认证
+// ─────────────────────────────────────────────
+
+// UserExists 返回 true 表示已有注册用户（只允许一个）
+func UserExists() bool {
+	var count int
+	DB.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
+	return count > 0
+}
+
+// CreateUser 插入新用户（已有用户时返回错误）
+func CreateUser(username, passwordHash string) error {
+	if UserExists() {
+		return fmt.Errorf("already registered")
+	}
+	_, err := DB.Exec("INSERT INTO users (username, password_hash) VALUES (?,?)", username, passwordHash)
+	return err
+}
+
+// GetUserByUsername 按用户名查询用户
+func GetUserByUsername(username string) (*User, error) {
+	u := &User{}
+	err := DB.QueryRow("SELECT id, username, password_hash FROM users WHERE username=?", username).Scan(&u.ID, &u.Username, &u.PasswordHash)
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
 }
 
 func seedDefaults() error {
@@ -300,6 +343,14 @@ func SetSetting(key, value string) error {
 	)
 	return err
 }
+
+// GetSettingPublic 读取单个配置项（用于后端内部展示，不标记 dirty）
+func GetSettingPublic(key string) (string, error) {
+	var v string
+	err := DB.QueryRow("SELECT value FROM settings WHERE key=?", key).Scan(&v)
+	return v, err
+}
+
 
 // ─────────────────────────────────────────────
 // D1 同步辅助

@@ -105,7 +105,8 @@ func main() {
 	// FRONTEND_DIR 设置时从磁盘加载（开发热更新）
 	// 未设置时从 embed 加载（生产单文件）
 	if frontendDir := os.Getenv("FRONTEND_DIR"); frontendDir != "" {
-		r.Static("/assets", frontendDir)
+		r.Static("/css", frontendDir+"/css")
+		r.Static("/js", frontendDir+"/js")
 		r.StaticFile("/", frontendDir+"/index.html")
 		log.Printf("[FRONTEND] Disk: %s", frontendDir)
 	} else {
@@ -113,7 +114,8 @@ func main() {
 		if err != nil {
 			log.Fatalf("embed: %v", err)
 		}
-		r.StaticFS("/assets", http.FS(sub))
+		r.StaticFS("/css", http.FS(mustSubFS(sub, "css")))
+		r.StaticFS("/js", http.FS(mustSubFS(sub, "js")))
 		r.GET("/", func(c *gin.Context) {
 			data, _ := embeddedFrontend.ReadFile("frontend/index.html")
 			c.Data(200, "text/html; charset=utf-8", data)
@@ -121,8 +123,16 @@ func main() {
 		log.Println("[FRONTEND] Embedded binary")
 	}
 
-	// ── API ──────────────────────────────────────
-	api := r.Group("/api")
+	// ── 认证路由（无需登录）─────────────────────
+	authGroup := r.Group("/api/auth")
+	{
+		authGroup.GET("/status", handlers.AuthStatus)
+		authGroup.POST("/register", handlers.Register)
+		authGroup.POST("/login", handlers.Login)
+	}
+
+	// ── 受保护的 API（需要登录）────────────────
+	api := r.Group("/api", handlers.AuthMiddleware())
 	{
 		api.GET("/data", func(c *gin.Context) {
 			groups, _ := db.GetGroups()
@@ -154,6 +164,18 @@ func main() {
 		api.POST("/sync/restore", handlers.RestoreFromD1(d1))
 		api.GET("/sync/status", handlers.GetD1Status(d1))
 		api.GET("/sync/logs", handlers.GetSyncLogs)
+
+		api.POST("/d1/configure", handlers.ConfigureD1(d1))
+	}
+
+	// ── /settings 独立页面 ──────────────────────
+	if frontendDir2 := os.Getenv("FRONTEND_DIR"); frontendDir2 != "" {
+		r.StaticFile("/settings", frontendDir2+"/settings.html")
+	} else {
+		r.GET("/settings", func(c *gin.Context) {
+			data, _ := embeddedFrontend.ReadFile("frontend/settings.html")
+			c.Data(200, "text/html; charset=utf-8", data)
+		})
 	}
 
 	r.GET("/health", func(c *gin.Context) {
@@ -168,4 +190,13 @@ func main() {
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
+}
+
+// mustSubFS 返回 embed FS 的子目录，出错则 panic
+func mustSubFS(fsys fs.FS, dir string) fs.FS {
+	sub, err := fs.Sub(fsys, dir)
+	if err != nil {
+		log.Fatalf("embed subfs %q: %v", dir, err)
+	}
+	return sub
 }

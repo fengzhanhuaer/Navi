@@ -76,11 +76,17 @@ func RestoreFromD1(d1 *db.D1HTTPClient) gin.HandlerFunc {
 	}
 }
 
-// GetD1Status 检查 D1 连接状态
+// GetD1Status 检查 D1 连接状态，同时返回已配置的账户信息
 func GetD1Status(d1 *db.D1HTTPClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		status, err := d1.GetD1Status()
-		resp := gin.H{"status": status}
+		accountID, _ := db.GetSettingPublic("cf_account_id")
+		databaseID, _ := db.GetSettingPublic("cf_database_id")
+		resp := gin.H{
+			"status":      status,
+			"account_id":  accountID,
+			"database_id": databaseID,
+		}
 		if err != nil {
 			resp["error"] = err.Error()
 		}
@@ -100,3 +106,28 @@ func GetSyncLogs(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, logs)
 }
+
+// ConfigureD1 接收 api_token，自动发现账户 + 查找/创建固定名称 "navi" 的数据库
+func ConfigureD1(d1 *db.D1HTTPClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var body struct {
+			APIToken string `json:"api_token" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "请提供 api_token"})
+			return
+		}
+		if err := db.ConfigureWithAPIKey(body.APIToken, "navi"); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		// 重新加载配置，初始化 D1 表
+		if err := d1.InitD1Tables(); err != nil {
+			c.JSON(http.StatusOK, gin.H{"ok": true, "warn": "配置成功，但初始化表失败: " + err.Error()})
+			return
+		}
+		db.LogSync("ok", "D1 configured via API key")
+		c.JSON(http.StatusOK, gin.H{"ok": true, "message": "配置成功，已连接到 D1 数据库 navi"})
+	}
+}
+

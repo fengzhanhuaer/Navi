@@ -211,6 +211,73 @@ body.light .top-bar {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, .15), var(--shadow-md);
 }
 
+/* 搜索引擎选择器 */
+.search-engine-selector {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.current-engine {
+  height: 100%;
+  padding: 0 12px 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+  border-radius: 50px 0 0 50px;
+  transition: all var(--transition);
+}
+
+.current-engine:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.current-engine img {
+  border-radius: 50%;
+}
+
+.engine-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: var(--glass);
+  min-width: 130px;
+  z-index: 100;
+  padding: 6px;
+  animation: fadeUp 0.2s ease;
+}
+
+.engine-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: .9rem;
+  transition: background 0.15s;
+}
+
+.engine-option:hover {
+  background: var(--surface-hover);
+}
+
+.engine-option img {
+  border-radius: 2px;
+}
+
 /* 搜索输入框 */
 .search-input {
   flex: 1;
@@ -950,3 +1017,253 @@ body.light .form-group select option {
     margin-bottom: 20px;
   }
 }
+
+/* ── 认证屏 (登录 / 注册) ── */
+#authScreen {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: scaleUp .25s cubic-bezier(.34, 1.56, .64, 1);
+}
+
+body.light .auth-card {
+  background: #fff;
+}
+
+.auth-header {
+  padding: 32px 32px 20px;
+  text-align: center;
+}
+
+.auth-logo {
+  font-size: 2.2rem;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.auth-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 4px;
+}
+
+.auth-subtitle {
+  font-size: .85rem;
+  color: var(--text-muted);
+}
+
+.auth-body {
+  padding: 8px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-field label {
+  font-size: .82rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.auth-field input {
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: .95rem;
+  outline: none;
+  transition: all var(--transition);
+}
+
+.auth-field input:focus {
+  border-color: var(--accent-1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, .15);
+  background: var(--surface-hover);
+}
+
+.auth-btn {
+  height: 44px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent-grad);
+  color: white;
+  font-family: var(--font);
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  margin-top: 4px;
+  letter-spacing: .3px;
+}
+
+.auth-btn:hover {
+  box-shadow: 0 4px 20px rgba(99, 102, 241, .45);
+  transform: translateY(-1px);
+}
+
+.auth-btn:active {
+  transform: scale(0.98);
+}
+
+.auth-error {
+  font-size: .83rem;
+  color: #ef4444;
+  text-align: center;
+  min-height: 20px;
+}
+
+/* ── Settings 独立页 ── */
+.settings-page {
+  position: relative;
+  z-index: 1;
+  max-width: 680px;
+  margin: 80px auto 0;
+  padding: 40px 24px;
+}
+
+.settings-page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.settings-page-header a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: .88rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color var(--transition);
+}
+
+.settings-page-header a:hover {
+  color: var(--accent-1);
+}
+
+.settings-page-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.settings-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: var(--glass);
+  padding: 28px;
+  margin-bottom: 20px;
+}
+
+.settings-card h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.setting-label {
+  font-size: .88rem;
+  color: var(--text-secondary);
+}
+
+.setting-value {
+  font-size: .88rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.settings-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.settings-logs {
+  margin-top: 20px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: .78rem;
+  font-family: 'Courier New', monospace;
+}
+
+.log-item {
+  display: flex;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.log-item:last-child { border-bottom: none; }
+.log-item .ls-ok { color: #22c55e; font-weight: 600; }
+.log-item .ls-error { color: #ef4444; font-weight: 600; }
+
+/* ── 拖拽排序样式反馈 ── */
+.group-header {
+  cursor: grab;
+}
+.group-header:active {
+  cursor: grabbing;
+}
+
+.site-card {
+  cursor: grab;
+}
+.site-card:active {
+  cursor: grabbing;
+}
+
+.sortable-ghost {
+  opacity: 0.4;
+  background-color: var(--surface-hover);
+  border: 1px dashed var(--border-strong);
+}
