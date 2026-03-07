@@ -62,6 +62,9 @@ const DOM = {
     // Settings modal
     settingsModalBackdrop: $('settingsModalBackdrop'),
     settingBackground: $('settingBackground'),
+    settingSearchEngine: $('settingSearchEngine'),
+    btnUpgrade: $('btnUpgrade'),
+    upgradeLog: $('upgradeLog'),
 };
 
 // ── Toast 通知 ────────────────────────────────
@@ -570,12 +573,38 @@ DOM.siteModalBackdrop.addEventListener('click', e => { if (e.target === DOM.site
 DOM.btnSettings.addEventListener('click', () => {
     DOM.settingsModalBackdrop.classList.remove('hidden');
     DOM.settingBackground.value = state.settings.background || 'gradient';
+    DOM.settingSearchEngine.value = localStorage.getItem('navi_search_engine') || 'google';
+    DOM.upgradeLog.classList.add('hidden');
+    DOM.upgradeLog.innerHTML = '';
 });
 
 DOM.settingBackground.addEventListener('change', async e => {
     state.settings.background = e.target.value;
     applyBackground(e.target.value);
     try { await api.settings.set('background', e.target.value); } catch { }
+});
+
+DOM.settingSearchEngine.addEventListener('change', e => {
+    setEngine(e.target.value);
+});
+
+DOM.btnUpgrade.addEventListener('click', async () => {
+    DOM.btnUpgrade.disabled = true;
+    DOM.btnUpgrade.textContent = '升级中...';
+    DOM.upgradeLog.classList.remove('hidden');
+    DOM.upgradeLog.innerHTML = '<div class="log-item">正在向服务器发送升级指令...</div>';
+    
+    try {
+        const res = await api.settings.upgrade();
+        DOM.upgradeLog.innerHTML += `<div class="log-item"><pre>${res.log || '升级已完成，无日志返回'}</pre></div>`;
+        toast('升级命令执行完毕，请根据日志查看是否成功。如果是重新编译更新，服务端可能将在一会后暂时断开。', 'success', 5000);
+    } catch (err) {
+        DOM.upgradeLog.innerHTML += `<div class="log-item ls-error">升级失败: ${err.message}</div>`;
+        toast('升级失败', 'error');
+    } finally {
+        DOM.btnUpgrade.disabled = false;
+        DOM.btnUpgrade.textContent = '检查并升级';
+    }
 });
 
 $('settingsModalClose').addEventListener('click', () => DOM.settingsModalBackdrop.classList.add('hidden'));

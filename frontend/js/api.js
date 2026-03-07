@@ -77,6 +77,7 @@ const api = {
     settings: {
         get: () => request('GET', '/settings'),
         set: (key, value) => request('PUT', `/settings/${key}`, { value }),
+        upgrade: () => request('POST', '/settings/upgrade'),
     },
 
     // D1 同步

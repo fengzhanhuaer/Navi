@@ -5,6 +5,7 @@ package handlers
 
 import (
 	"net/http"
+	"os/exec"
 
 	"navi/db"
 
@@ -129,5 +130,16 @@ func ConfigureD1(d1 *db.D1HTTPClient) gin.HandlerFunc {
 		db.LogSync("ok", "D1 configured via API key")
 		c.JSON(http.StatusOK, gin.H{"ok": true, "message": "配置成功，已连接到 D1 数据库 navi"})
 	}
+}
+
+// UpgradeSystem 执行 git pull 后返回日志
+func UpgradeSystem(c *gin.Context) {
+	cmd := exec.Command("git", "pull")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "log": string(out)})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "log": string(out)})
 }
 

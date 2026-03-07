@@ -72,6 +72,8 @@
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
           </svg>
         </button>
+      </div>
+      <div class="top-bar-right">
         <button class="icon-btn" id="btnSettings" title="系统设置">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3" />
@@ -79,8 +81,6 @@
               d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg>
         </button>
-      </div>
-      <div class="top-bar-right">
         <!-- 退出登录 -->
         <button class="icon-btn" id="btnLogout" title="退出登录">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -216,6 +216,17 @@
                 <option value="baidu">百度</option>
               </select>
             </div>
+          </div>
+          <div class="settings-section">
+            <h3>系统维护</h3>
+            <div class="form-group" style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span style="font-size: .88rem; color: var(--text-primary);">版本更新</span>
+                <p style="font-size: .78rem; color: var(--text-muted); margin-top: 4px;">检查最新代码并一键升级</p>
+              </div>
+              <button class="btn-primary" id="btnUpgrade" style="padding: 6px 12px; font-size: .88rem;">检查并升级</button>
+            </div>
+            <div id="upgradeLog" class="settings-logs hidden" style="margin-top: 10px;"></div>
           </div>
         </div>
       </div>
