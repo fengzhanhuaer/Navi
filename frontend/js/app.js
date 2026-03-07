@@ -644,18 +644,29 @@ async function init() {
         const { registered } = await api.auth.status();
 
         if (token) {
-            // 有 token → 直接尝试加载（若 token 过期 api.js 会自动 reload）
-            await loadApp();
+            // 有 token → 尝试加载应用主业务
+            try {
+                await loadApp();
+            } catch (appErr) {
+                // 若出现 token 伪造或失效会在 api.js 触发 401 自动 reload 或抛出异常
+                // 如果后端挂了或者其他异常在这里会提示
+                if (appErr.message !== '请重新登录') {
+                    console.error('App init failed:', appErr);
+                } else {
+                    // 对于主动抛出的 401 错落到这里，展示登录（如果在 api 层面 reload 则不会走到这）
+                    showAuth('login');
+                }
+            }
         } else if (!registered) {
             // 还没有用户 → 显示注册页
             showAuth('register');
         } else {
-            // 已有用户但没 token → 显示登录页
+            // 已有用户但没 token / 或者从 token 清除态中重刷过来 → 显示登录页
             showAuth('login');
         }
     } catch (err) {
         // 连不上服务器
-        toast('无法连接到服务器', 'error', 8000);
+        toast('无法连接到服务器，请检查后端运行状态。', 'error', 8000);
         console.error(err);
     }
 }
