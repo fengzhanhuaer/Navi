@@ -211,72 +211,7 @@ body.light .top-bar {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, .15), var(--shadow-md);
 }
 
-/* 搜索引擎选择器 */
-.search-engine-selector {
-  position: relative;
-  height: 100%;
-  display: flex;
-  align-items: center;
-}
 
-.current-engine {
-  height: 100%;
-  padding: 0 12px 0 16px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  border-right: 1px solid var(--border);
-  border-radius: 50px 0 0 50px;
-  transition: all var(--transition);
-}
-
-.current-engine:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
-.current-engine img {
-  border-radius: 50%;
-}
-
-.engine-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  backdrop-filter: var(--glass);
-  min-width: 130px;
-  z-index: 100;
-  padding: 6px;
-  animation: fadeUp 0.2s ease;
-}
-
-.engine-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: .9rem;
-  transition: background 0.15s;
-}
-
-.engine-option:hover {
-  background: var(--surface-hover);
-}
-
-.engine-option img {
-  border-radius: 2px;
-}
 
 /* 搜索输入框 */
 .search-input {
