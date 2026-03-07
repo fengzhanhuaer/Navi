@@ -751,6 +751,34 @@ body.light .form-group select option {
   background: var(--surface-hover);
 }
 
+/* 常用 Emoji 选择器 */
+.emoji-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.emoji-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.emoji-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent-1);
+  transform: scale(1.1);
+}
+
+.emoji-btn:active {
+  transform: scale(0.95);
+}
+
 .modal-footer {
   display: flex;
   gap: 10px;

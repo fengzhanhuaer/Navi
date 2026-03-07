@@ -57,6 +57,7 @@ const DOM = {
     groupId: $('groupId'),
     groupName: $('groupName'),
     groupIcon: $('groupIcon'),
+    emojiPicker: $('emojiPicker'),
 
     // Settings modal
     settingsModalBackdrop: $('settingsModalBackdrop'),
@@ -295,10 +296,6 @@ function renderBookmarks() {
         </div>
         <div class="sites-grid">
           ${sitesHtml}
-          <button class="add-site-card btn-add-site" data-gid="${group.id}">
-            <div class="add-site-icon">＋</div>
-            <span class="add-site-label">添加</span>
-          </button>
         </div>
       </div>`;
     }).join('');
@@ -339,14 +336,40 @@ function initSortable() {
         }
     });
 
-    // 2. 书签网站拖拽
+    // 2. 书签网站拖拽 (跨组)
     document.querySelectorAll('.sites-grid').forEach(grid => {
         Sortable.create(grid, {
+            group: 'shared-sites', // 允许跨 grid 拖拽
             animation: 150,
-            filter: '.add-site-card',
             ghostClass: 'sortable-ghost',
-            onEnd: async function () {
-                const siteCards = grid.querySelectorAll('.site-card');
+            onEnd: async function (evt) {
+                // 如果跨组拖拽了，则要更新该书签的 group_id
+                const siteId = parseInt(evt.item.dataset.siteId);
+                const newGroupId = parseInt(evt.to.closest('.group-card').dataset.groupId);
+                const oldGroupId = parseInt(evt.from.closest('.group-card').dataset.groupId);
+                
+                const s = state.sites.find(x => x.id === siteId);
+                if (!s) return;
+
+                if (newGroupId !== oldGroupId) {
+                    s.group_id = newGroupId;
+                    // 同步到后端更新 group_id
+                    try {
+                        await api.sites.update(siteId, {
+                            group_id: newGroupId,
+                            title: s.title,
+                            url: s.url,
+                            icon: s.icon
+                        });
+                    } catch (e) {
+                        toast('跨组移动失败: ' + e.message, 'error');
+                        loadData();
+                        return;
+                    }
+                }
+
+                // 无论是同组排序还是跨组，都需要更新目标组内的所有元素顺序
+                const siteCards = evt.to.querySelectorAll('.site-card');
                 const items = Array.from(siteCards).map((el, index) => ({
                     id: parseInt(el.dataset.siteId),
                     order: index
@@ -426,6 +449,25 @@ function bindBookmarkEvents() {
 }
 
 // ── 分组模态框 ────────────────────────────────
+const PRESET_EMOJIS = [
+    '📁', '⭐️', '📚', '💼', '🎮', '🛠️', '🎵', '📺', '🛍️', '💡', '💰', '🚀', '🧠', '☁️', '🔥',
+    '💻', '📱', '🎨', '📝', '🔗', '📰', '🕹️', '✉️', '📅', '🗑️', '🔍', '⚙️', '🔒', '🔑', '🌍'
+];
+
+function initEmojiPicker() {
+    if (DOM.emojiPicker.children.length === 0) {
+        DOM.emojiPicker.innerHTML = PRESET_EMOJIS.map(e => 
+            `<button type="button" class="emoji-btn">${e}</button>`
+        ).join('');
+        
+        DOM.emojiPicker.addEventListener('click', e => {
+            if (e.target.classList.contains('emoji-btn')) {
+                DOM.groupIcon.value = e.target.textContent;
+            }
+        });
+    }
+}
+
 function openGroupModal(groupId = null) {
     state.editingGroupId = groupId;
     if (groupId) {
@@ -440,6 +482,7 @@ function openGroupModal(groupId = null) {
         DOM.groupForm.reset();
         DOM.groupIcon.value = '📁';
     }
+    initEmojiPicker();
     DOM.groupModalBackdrop.classList.remove('hidden');
     DOM.groupName.focus();
 }
