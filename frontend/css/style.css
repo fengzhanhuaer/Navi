@@ -1102,6 +1102,19 @@ body.light .auth-card {
   min-height: 20px;
 }
 
+.auth-switch {
+  text-align: center;
+  margin-top: 12px;
+  font-size: .85rem;
+  color: var(--text-muted, rgba(255,255,255,0.5));
+}
+.auth-switch a {
+  color: var(--accent, #818cf8);
+  text-decoration: none;
+  font-weight: 500;
+}
+.auth-switch a:hover { text-decoration: underline; }
+
 /* ── Settings 独立页 ── */
 .settings-page {
   position: relative;

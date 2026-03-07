@@ -22,6 +22,8 @@ const DOM = {
     authUsername: $('authUsername'),
     authPassword: $('authPassword'),
     authError: $('authError'),
+    authSwitchLink: $('authSwitchLink'),
+    authSwitch: $('authSwitch'),
 
     // 主应用
     appRoot: $('appRoot'),
@@ -96,11 +98,19 @@ function showAuth(mode) {
         DOM.authTitle.textContent = '欢迎使用 Navi';
         DOM.authSubtitle.textContent = '首次使用，请先注册账号';
         DOM.authBtn.textContent = '注 册';
+        DOM.authSwitchLink.textContent = '点击登录';
+        DOM.authSwitch.innerHTML = '已有账号？<a href="#" id="authSwitchLink">点击登录</a>';
     } else {
         DOM.authTitle.textContent = '欢迎回来';
         DOM.authSubtitle.textContent = '请输入密码登录';
         DOM.authBtn.textContent = '登 录';
+        DOM.authSwitch.innerHTML = '没有账号？<a href="#" id="authSwitchLink">点击注册</a>';
     }
+    // 重新绑定切换链接事件（因为 innerHTML 重建了 DOM）
+    document.getElementById('authSwitchLink').addEventListener('click', e => {
+        e.preventDefault();
+        showAuth(authMode === 'register' ? 'login' : 'register');
+    });
     setTimeout(() => DOM.authUsername.focus(), 100);
 }
 
