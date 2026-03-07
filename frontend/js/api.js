@@ -19,10 +19,10 @@ async function request(method, path, body) {
     if (body !== undefined) opts.body = JSON.stringify(body);
     const res = await fetch(API_BASE + path, opts);
 
-    // 401 → 清 token，跳回首页（会触发登录界面）
+    // 401 → 清 token，跳转到登录页
     if (res.status === 401) {
         localStorage.removeItem('navi_token');
-        location.reload();
+        location.replace('/login');
         throw new Error('请重新登录');
     }
 

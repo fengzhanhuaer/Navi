@@ -175,12 +175,22 @@ func main() {
 		api.POST("/d1/configure", handlers.ConfigureD1(d1))
 	}
 
-	// ── /settings 独立页面 ──────────────────────
+	// ── 独立页面路由 ──────────────────────
 	if frontendDir2 := os.Getenv("FRONTEND_DIR"); frontendDir2 != "" {
 		r.StaticFile("/settings", frontendDir2+"/settings.html")
+		r.StaticFile("/login", frontendDir2+"/login.html")
+		r.StaticFile("/register", frontendDir2+"/register.html")
 	} else {
 		r.GET("/settings", func(c *gin.Context) {
 			data, _ := embeddedFrontend.ReadFile("frontend/settings.html")
+			c.Data(200, "text/html; charset=utf-8", data)
+		})
+		r.GET("/login", func(c *gin.Context) {
+			data, _ := embeddedFrontend.ReadFile("frontend/login.html")
+			c.Data(200, "text/html; charset=utf-8", data)
+		})
+		r.GET("/register", func(c *gin.Context) {
+			data, _ := embeddedFrontend.ReadFile("frontend/register.html")
 			c.Data(200, "text/html; charset=utf-8", data)
 		})
 	}

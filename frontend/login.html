@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>登录 — Navi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="dark">
+  <div class="bg-layer"></div>
+  <div class="bg-overlay"></div>
+
+  <div id="authScreen">
+    <div class="auth-card">
+      <div class="auth-header">
+        <span class="auth-logo">🧭</span>
+        <div class="auth-title">欢迎回来</div>
+        <div class="auth-subtitle">请输入密码登录</div>
+      </div>
+      <div class="auth-body">
+        <div class="auth-field">
+          <label for="authUsername">用户名</label>
+          <input type="text" id="authUsername" placeholder="输入用户名" autocomplete="username" />
+        </div>
+        <div class="auth-field">
+          <label for="authPassword">密码</label>
+          <input type="password" id="authPassword" placeholder="输入密码" autocomplete="current-password" />
+        </div>
+        <div class="auth-error" id="authError"></div>
+        <button class="auth-btn" id="authBtn">登 录</button>
+        <p class="auth-switch">
+          没有账号？<a href="/register">点击注册</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 已登录则直接跳回主页
+    if (localStorage.getItem('navi_token')) {
+      location.replace('/');
+    }
+
+    const btn = document.getElementById('authBtn');
+    const err = document.getElementById('authError');
+
+    async function doLogin() {
+      const username = document.getElementById('authUsername').value.trim();
+      const password = document.getElementById('authPassword').value;
+      err.textContent = '';
+      if (!username || !password) { err.textContent = '用户名和密码不能为空'; return; }
+      btn.disabled = true; btn.textContent = '登录中...';
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        localStorage.setItem('navi_token', data.token);
+        location.replace('/');
+      } catch (e) {
+        err.textContent = e.message;
+      } finally {
+        btn.disabled = false; btn.textContent = '登 录';
+      }
+    }
+
+    btn.addEventListener('click', doLogin);
+    document.getElementById('authPassword').addEventListener('keydown', e => e.key === 'Enter' && doLogin());
+    document.getElementById('authUsername').addEventListener('keydown', e => e.key === 'Enter' && document.getElementById('authPassword').focus());
+    setTimeout(() => document.getElementById('authUsername').focus(), 100);
+  </script>
+</body>
+</html>

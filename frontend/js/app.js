@@ -14,17 +14,6 @@ const state = {
 const $ = id => document.getElementById(id);
 
 const DOM = {
-    // 认证屏
-    authScreen: $('authScreen'),
-    authTitle: $('authTitle'),
-    authSubtitle: $('authSubtitle'),
-    authBtn: $('authBtn'),
-    authUsername: $('authUsername'),
-    authPassword: $('authPassword'),
-    authError: $('authError'),
-    authSwitchLink: $('authSwitchLink'),
-    authSwitch: $('authSwitch'),
-
     // 主应用
     appRoot: $('appRoot'),
     greeting: $('greeting'),
@@ -83,81 +72,9 @@ function toast(msg, type = 'info', duration = 3000) {
     }, duration);
 }
 
-// ── 认证：显示登录或注册界面 ──────────────────
-let authMode = 'register'; // 'register' | 'login'
-
-function showAuth(mode) {
-    authMode = mode;
-    DOM.authScreen.classList.remove('hidden');
-    DOM.appRoot.classList.add('hidden');
-    DOM.authError.textContent = '';
-    DOM.authUsername.value = '';
-    DOM.authPassword.value = '';
-
-    if (mode === 'register') {
-        DOM.authTitle.textContent = '欢迎使用 Navi';
-        DOM.authSubtitle.textContent = '首次使用，请先注册账号';
-        DOM.authBtn.textContent = '注 册';
-        DOM.authSwitch.innerHTML = '已有账号？<a href="#" id="authSwitchLink">点击登录</a>';
-    } else {
-        DOM.authTitle.textContent = '欢迎回来';
-        DOM.authSubtitle.textContent = '请输入密码登录';
-        DOM.authBtn.textContent = '登 录';
-        DOM.authSwitch.innerHTML = '没有账号？<a href="#" id="authSwitchLink">点击注册</a>';
-    }
-    setTimeout(() => DOM.authUsername.focus(), 100);
-}
-
-// 事件委托: 用父元素监听一次，不受 innerHTML 重建影响
-DOM.authScreen.addEventListener('click', e => {
-    if (e.target && e.target.id === 'authSwitchLink') {
-        e.preventDefault();
-        showAuth(authMode === 'register' ? 'login' : 'register');
-    }
-});
-
 function showApp() {
-    DOM.authScreen.classList.add('hidden');
     DOM.appRoot.classList.remove('hidden');
 }
-
-DOM.authBtn.addEventListener('click', async () => {
-    const username = DOM.authUsername.value.trim();
-    const password = DOM.authPassword.value;
-    DOM.authError.textContent = '';
-
-    if (!username || !password) {
-        DOM.authError.textContent = '用户名和密码不能为空';
-        return;
-    }
-
-    DOM.authBtn.disabled = true;
-    DOM.authBtn.textContent = '处理中...';
-
-    try {
-        let result;
-        if (authMode === 'register') {
-            result = await api.auth.register(username, password);
-        } else {
-            result = await api.auth.login(username, password);
-        }
-        localStorage.setItem('navi_token', result.token);
-        await loadApp();
-    } catch (err) {
-        DOM.authError.textContent = err.message;
-    } finally {
-        DOM.authBtn.disabled = false;
-        DOM.authBtn.textContent = authMode === 'register' ? '注 册' : '登 录';
-    }
-});
-
-// 回车也可提交
-DOM.authPassword.addEventListener('keydown', e => {
-    if (e.key === 'Enter') DOM.authBtn.click();
-});
-DOM.authUsername.addEventListener('keydown', e => {
-    if (e.key === 'Enter') DOM.authPassword.focus();
-});
 
 // ── 退出登录 ──────────────────────────────────
 DOM.btnLogout.addEventListener('click', () => {
@@ -660,21 +577,20 @@ async function init() {
             try {
                 await loadApp();
             } catch (appErr) {
-                // 若出现 token 伪造或失效会在 api.js 触发 401 自动 reload 或抛出异常
-                // 如果后端挂了或者其他异常在这里会提示
                 if (appErr.message !== '请重新登录') {
                     console.error('App init failed:', appErr);
+                    toast('加载失败：' + appErr.message, 'error');
                 } else {
-                    // 对于主动抛出的 401 错落到这里，展示登录（如果在 api 层面 reload 则不会走到这）
-                    showAuth('login');
+                    // 对于主动抛出的 401，跳转到登录
+                    location.replace('/login');
                 }
             }
         } else if (!registered) {
-            // 还没有用户 → 显示注册页
-            showAuth('register');
+            // 还没有用户 → 跳转注册页
+            location.replace('/register');
         } else {
-            // 已有用户但没 token / 或者从 token 清除态中重刷过来 → 显示登录页
-            showAuth('login');
+            // 已有用户但没 token → 跳转登录页
+            location.replace('/login');
         }
     } catch (err) {
         // 连不上服务器
