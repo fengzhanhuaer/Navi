@@ -56,16 +56,28 @@ download_binary() {
     fi
 
     DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY_NAME}"
-    
+    TMP_FILE="$(mktemp /tmp/navi-download.XXXXXX)"
+
     info "Downloading $DOWNLOAD_URL ..."
-    mkdir -p "$INSTALL_DIR"
-    
-    if ! curl -fsSL "$DOWNLOAD_URL" -o "${INSTALL_DIR}/navi"; then
-        error "Download failed. Please check if release ${VERSION} with asset ${BINARY_NAME} exists."
+    info "  → Temp: $TMP_FILE"
+
+    # 下载到临时文件（加重试，避免写入目标目录出错）
+    if ! curl -fsSL --retry 3 --retry-delay 2 "$DOWNLOAD_URL" -o "$TMP_FILE"; then
+        rm -f "$TMP_FILE"
+        error "Download failed. Please check network or verify release ${VERSION} asset ${BINARY_NAME} exists."
     fi
-    
+
+    # 验证下载文件有效（大小大于 1MB）
+    FILE_SIZE=$(stat -c%s "$TMP_FILE" 2>/dev/null || stat -f%z "$TMP_FILE" 2>/dev/null || echo 0)
+    if [ "$FILE_SIZE" -lt 1048576 ]; then
+        rm -f "$TMP_FILE"
+        error "Downloaded file is too small (${FILE_SIZE} bytes). The release may not exist yet."
+    fi
+
+    mkdir -p "$INSTALL_DIR"
+    mv "$TMP_FILE" "${INSTALL_DIR}/navi"
     chmod +x "${INSTALL_DIR}/navi"
-    info "Saved to ${INSTALL_DIR}/navi"
+    info "Saved to ${INSTALL_DIR}/navi (${FILE_SIZE} bytes)"
 }
 
 # ── 创建配置文件 ────────────────────────────────
