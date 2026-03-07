@@ -3,7 +3,7 @@
 # Navi 一键安装脚本（Linux / macOS）
 #
 # 用法：
-#   curl -fsSL https://raw.githubusercontent.com/YOUR_USER/Navi/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/fengzhanhuaer/Navi/main/scripts/install.sh | bash
 #   或指定版本：
 #   VERSION=v1.0.0 bash install.sh
 
@@ -43,21 +43,39 @@ get_latest_version() {
         info "Using specified version: $VERSION"
         return
     fi
-    VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-        | grep '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+    VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     [ -z "$VERSION" ] && error "Failed to get latest version. Check $REPO releases."
     info "Latest version: $VERSION"
 }
 
 # ── 下载二进制 ──────────────────────────────────
 download_binary() {
-    BINARY_NAME="navi-${PLATFORM}"
+    # Unix 分发通常为 tar.gz
+    BINARY_NAME="navi_${VERSION}_${PLATFORM}.tar.gz"
+    if [ "$OS" = "windows" ]; then
+        BINARY_NAME="navi_${VERSION}_${PLATFORM}.zip"
+    fi
+
     DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY_NAME}"
     
     info "Downloading $DOWNLOAD_URL ..."
     mkdir -p "$INSTALL_DIR"
-    curl -fsSL "$DOWNLOAD_URL" -o "${INSTALL_DIR}/navi"
+    TMP_DIR=$(mktemp -d)
+    
+    if ! curl -fsSL "$DOWNLOAD_URL" -o "${TMP_DIR}/${BINARY_NAME}"; then
+        error "Download failed. Please check if release ${VERSION} with asset ${BINARY_NAME} exists."
+    fi
+    
+    info "Extracting..."
+    if [[ "$BINARY_NAME" == *.zip ]]; then
+        unzip -q "${TMP_DIR}/${BINARY_NAME}" -d "$TMP_DIR"
+    else
+        tar -xzf "${TMP_DIR}/${BINARY_NAME}" -C "$TMP_DIR"
+    fi
+    
+    cp "${TMP_DIR}/navi" "${INSTALL_DIR}/navi"
     chmod +x "${INSTALL_DIR}/navi"
+    rm -rf "$TMP_DIR"
     info "Saved to ${INSTALL_DIR}/navi"
 }
 
