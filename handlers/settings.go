@@ -155,11 +155,16 @@ func UpgradeSystem(c *gin.Context) {
 	client := github.NewClient(nil)
 	ctx := context.Background()
 	
-	release, _, err := client.Repositories.GetLatestRelease(ctx, repoOwner, repoName)
+	releases, _, err := client.Repositories.ListReleases(ctx, repoOwner, repoName, &github.ListOptions{PerPage: 1})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取最新版本失败: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取发布列表失败: " + err.Error()})
 		return
 	}
+	if len(releases) == 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "在仓库中没有找到任何发布版本"})
+		return
+	}
+	release := releases[0]
 
 	// 查找匹配当前系统架构的资产文件
 	var assetURL string

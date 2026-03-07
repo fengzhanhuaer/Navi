@@ -43,7 +43,7 @@ get_latest_version() {
         info "Using specified version: $VERSION"
         return
     fi
-    VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases" | grep -m 1 '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     [ -z "$VERSION" ] && error "Failed to get latest version. Check $REPO releases."
     info "Latest version: $VERSION"
 }
