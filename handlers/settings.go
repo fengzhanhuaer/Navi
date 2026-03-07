@@ -4,9 +4,6 @@
 package handlers
 
 import (
-	"archive/tar"
-	"archive/zip"
-	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -168,13 +165,11 @@ func UpgradeSystem(c *gin.Context) {
 
 	// 查找匹配当前系统架构的资产文件
 	var assetURL string
-	var assetName string
-	targetSuffix := fmt.Sprintf("%s_%s", runtime.GOOS, runtime.GOARCH) // ex: windows_amd64
+	targetSuffix := fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH) // ex: windows-amd64
 	
 	for _, asset := range release.Assets {
 		if strings.Contains(*asset.Name, targetSuffix) {
 			assetURL = *asset.BrowserDownloadURL
-			assetName = *asset.Name
 			break
 		}
 	}
@@ -192,31 +187,18 @@ func UpgradeSystem(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 
+	currExec, err := os.Executable()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取当前执行路径失败: " + err.Error()})
+		return
+	}
+
 	tmpDir, err := os.MkdirTemp("", "navi-update-*")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建临时目录失败: " + err.Error()})
 		return
 	}
 	defer os.RemoveAll(tmpDir)
-
-	tmpZipPath := filepath.Join(tmpDir, assetName)
-	out, err := os.Create(tmpZipPath)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建临时文件失败: " + err.Error()})
-		return
-	}
-	_, err = io.Copy(out, resp.Body)
-	out.Close()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存压缩包失败: " + err.Error()})
-		return
-	}
-
-	currExec, err := os.Executable()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取当前执行路径失败: " + err.Error()})
-		return
-	}
 
 	// 在临时目录生成新版本执行文件，以备自测
 	tmpNewExec := filepath.Join(tmpDir, "navi_new.exe")
@@ -225,83 +207,15 @@ func UpgradeSystem(c *gin.Context) {
 	}
 
 	// 提取二进制的辅助函数，将新程序写入到给定的路径并赋予执行权限
-	extractBinary := func(src io.Reader, target string) error {
-		newFile, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
-		if err != nil {
-			return fmt.Errorf("打开新文件失败: %v", err)
-		}
-		_, err = io.Copy(newFile, src)
-		newFile.Close()
-		if err != nil {
-			return fmt.Errorf("写入新文件失败: %v", err)
-		}
-		return nil
-	}
-
-	var extracted bool
-	if strings.HasSuffix(assetName, ".zip") {
-		r, err := zip.OpenReader(tmpZipPath)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "zip解压失败: " + err.Error()})
-			return
-		}
-		defer r.Close()
-
-		for _, f := range r.File {
-			if strings.HasSuffix(f.Name, "navi.exe") || strings.HasSuffix(f.Name, "navi") {
-				rc, err := f.Open()
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "读取zip内文件失败: " + err.Error()})
-					return
-				}
-				if err := extractBinary(rc, tmpNewExec); err != nil {
-					rc.Close()
-					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-					return
-				}
-				rc.Close()
-				extracted = true
-				break
-			}
-		}
-	} else if strings.HasSuffix(assetName, ".tar.gz") {
-		f, err := os.Open(tmpZipPath)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "打开tar.gz失败: " + err.Error()})
-			return
-		}
-		defer f.Close()
-		gr, err := gzip.NewReader(f)
-		if err == nil {
-			defer gr.Close()
-			tr := tar.NewReader(gr)
-			for {
-				hdr, err := tr.Next()
-				if err == io.EOF { break }
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "读取tar文件失败: " + err.Error()})
-					return
-				}
-				if strings.HasSuffix(hdr.Name, "navi.exe") || strings.HasSuffix(hdr.Name, "navi") {
-					if err := extractBinary(tr, tmpNewExec); err != nil {
-						c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-						return
-					}
-					extracted = true
-					break
-				}
-			}
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "gzip解码失败: " + err.Error()})
-			return
-		}
-	} else {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "不支持的打包格式，预期为 .zip 或 .tar.gz"})
+	newFile, err := os.OpenFile(tmpNewExec, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "打开新文件失败: " + err.Error()})
 		return
 	}
-
-	if !extracted {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "压缩包中未找到 navi 执行文件"})
+	_, err = io.Copy(newFile, resp.Body)
+	newFile.Close()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "写入新文件失败: " + err.Error()})
 		return
 	}
 
@@ -321,13 +235,25 @@ func UpgradeSystem(c *gin.Context) {
 	}
 
 	// 将自检通过的包覆写到真实执行路径
-	if err := extractBinary(func() io.Reader {
-		tr, _ := os.Open(tmpNewExec)
-		return tr
-	}(), currExec); err != nil {
-		// 恢复原有的入口程序
+	srcFile, err := os.Open(tmpNewExec)
+	if err != nil {
 		os.Rename(oldExec, currExec)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "替换新版本并赋予执行环境失败已被回滚: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取临时新版本失败被回滚: " + err.Error()})
+		return
+	}
+	defer srcFile.Close()
+
+	destFile, err := os.OpenFile(currExec, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
+	if err != nil {
+		os.Rename(oldExec, currExec)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "写入新版本失败已被回滚: " + err.Error()})
+		return
+	}
+	_, err = io.Copy(destFile, srcFile)
+	destFile.Close()
+	if err != nil {
+		os.Rename(oldExec, currExec)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "替换新版本内容失败已被回滚: " + err.Error()})
 		return
 	}
 

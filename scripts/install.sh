@@ -50,32 +50,21 @@ get_latest_version() {
 
 # ── 下载二进制 ──────────────────────────────────
 download_binary() {
-    # Unix 分发通常为 tar.gz
-    BINARY_NAME="navi_${VERSION}_${PLATFORM}.tar.gz"
+    BINARY_NAME="navi-${PLATFORM}"
     if [ "$OS" = "windows" ]; then
-        BINARY_NAME="navi_${VERSION}_${PLATFORM}.zip"
+        BINARY_NAME="navi-${PLATFORM}.exe"
     fi
 
     DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY_NAME}"
     
     info "Downloading $DOWNLOAD_URL ..."
     mkdir -p "$INSTALL_DIR"
-    TMP_DIR=$(mktemp -d)
     
-    if ! curl -fsSL "$DOWNLOAD_URL" -o "${TMP_DIR}/${BINARY_NAME}"; then
+    if ! curl -fsSL "$DOWNLOAD_URL" -o "${INSTALL_DIR}/navi"; then
         error "Download failed. Please check if release ${VERSION} with asset ${BINARY_NAME} exists."
     fi
     
-    info "Extracting..."
-    if [[ "$BINARY_NAME" == *.zip ]]; then
-        unzip -q "${TMP_DIR}/${BINARY_NAME}" -d "$TMP_DIR"
-    else
-        tar -xzf "${TMP_DIR}/${BINARY_NAME}" -C "$TMP_DIR"
-    fi
-    
-    cp "${TMP_DIR}/navi" "${INSTALL_DIR}/navi"
     chmod +x "${INSTALL_DIR}/navi"
-    rm -rf "$TMP_DIR"
     info "Saved to ${INSTALL_DIR}/navi"
 }
 

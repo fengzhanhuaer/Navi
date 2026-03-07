@@ -1,76 +1,92 @@
-# .github/workflows/release.yml
-# 推送 tag（如 v1.0.0）时自动构建多平台二进制并发布 GitHub Release
+# .github/workflows/main.yml
+# 每次推送到 main 分支时，自动构建多平台二进制并发布 GitHub Release 
 
 name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  build-and-release:
     name: Build & Release
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag & bump patch
+        id: bump
+        run: |
+          LATEST=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -z "$LATEST" ]; then
+            NEW_TAG="v0.1.0"
+          else
+            VERSION="${LATEST#v}"
+            MAJOR=$(echo "$VERSION" | cut -d. -f1)
+            MINOR=$(echo "$VERSION" | cut -d. -f2)
+            PATCH=$(echo "$VERSION" | cut -d. -f3)
+            PATCH=$((PATCH + 1))
+            NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
+          echo "VERSION=$NEW_TAG" >> $GITHUB_ENV
+
+      - name: Create & push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$NEW_TAG" -m "Auto release $NEW_TAG"
+          git push origin "$NEW_TAG"
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
 
-      - name: Get version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
       - name: Download dependencies
-        run: go mod tidy
+        run: |
+          go version
+          go mod tidy
 
       - name: Build all platforms
-        env:
-          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           mkdir -p dist
           
           echo "Building linux/amd64..."
-          GOOS=linux GOARCH=amd64 go build \
-            -ldflags="-s -w -X main.Version=${VERSION}" \
-            -o dist/navi-linux-amd64 .
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${VERSION}" -o dist/navi-linux-amd64 .
           
           echo "Building linux/arm64..."
-          GOOS=linux GOARCH=arm64 go build \
-            -ldflags="-s -w -X main.Version=${VERSION}" \
-            -o dist/navi-linux-arm64 .
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.Version=${VERSION}" -o dist/navi-linux-arm64 .
           
           echo "Building windows/amd64..."
-          GOOS=windows GOARCH=amd64 go build \
-            -ldflags="-s -w -X main.Version=${VERSION}" \
-            -o dist/navi-windows-amd64.exe .
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${VERSION}" -o dist/navi-windows-amd64.exe .
           
           echo "Building darwin/amd64..."
-          GOOS=darwin GOARCH=amd64 go build \
-            -ldflags="-s -w -X main.Version=${VERSION}" \
-            -o dist/navi-darwin-amd64 .
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${VERSION}" -o dist/navi-darwin-amd64 .
           
           echo "Building darwin/arm64 (Apple Silicon)..."
-          GOOS=darwin GOARCH=arm64 go build \
-            -ldflags="-s -w -X main.Version=${VERSION}" \
-            -o dist/navi-darwin-arm64 .
-
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X main.Version=${VERSION}" -o dist/navi-darwin-arm64 .
+          
           ls -lh dist/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "Navi ${{ steps.version.outputs.VERSION }}"
+          tag_name: ${{ env.NEW_TAG }}
+          name: "Navi ${{ env.NEW_TAG }}"
           body: |
-            ## 🧭 Navi ${{ steps.version.outputs.VERSION }}
+            ## 🧭 Navi ${{ env.NEW_TAG }}
 
             单文件可执行程序，内嵌前端，下载即用。
 
@@ -85,14 +101,9 @@ jobs:
             | macOS Apple Silicon | `navi-darwin-arm64` |
 
             ### ⭐ Linux 一键安装
-            ```bash
+            \`\`\`bash
             curl -fsSL https://raw.githubusercontent.com/fengzhanhuaer/Navi/main/scripts/install.sh | sudo bash
-            ```
-
-            ### Windows PowerShell
-            ```powershell
-            irm https://raw.githubusercontent.com/fengzhanhuaer/Navi/main/scripts/install.ps1 | iex
-            ```
+            \`\`\`
           files: |
             dist/navi-linux-amd64
             dist/navi-linux-arm64
