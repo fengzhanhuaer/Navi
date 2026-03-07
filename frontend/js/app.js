@@ -80,8 +80,12 @@ function showApp() {
 DOM.btnLogout.addEventListener('click', () => {
     if (!confirm('确定退出登录？')) return;
     localStorage.removeItem('navi_token');
-    location.reload();
+    location.replace('/login');
 });
+
+function showApp() {
+    DOM.appRoot.classList.remove('hidden');
+}
 
 // ── 问候语 ────────────────────────────────────
 function updateGreeting() {
@@ -575,6 +579,8 @@ async function init() {
         if (token) {
             // 有 token → 尝试加载应用主业务
             try {
+                // 加载成功后展示应用
+                showApp();
                 await loadApp();
             } catch (appErr) {
                 if (appErr.message !== '请重新登录') {
