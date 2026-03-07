@@ -98,7 +98,6 @@ function showAuth(mode) {
         DOM.authTitle.textContent = '欢迎使用 Navi';
         DOM.authSubtitle.textContent = '首次使用，请先注册账号';
         DOM.authBtn.textContent = '注 册';
-        DOM.authSwitchLink.textContent = '点击登录';
         DOM.authSwitch.innerHTML = '已有账号？<a href="#" id="authSwitchLink">点击登录</a>';
     } else {
         DOM.authTitle.textContent = '欢迎回来';
@@ -106,13 +105,16 @@ function showAuth(mode) {
         DOM.authBtn.textContent = '登 录';
         DOM.authSwitch.innerHTML = '没有账号？<a href="#" id="authSwitchLink">点击注册</a>';
     }
-    // 重新绑定切换链接事件（因为 innerHTML 重建了 DOM）
-    document.getElementById('authSwitchLink').addEventListener('click', e => {
-        e.preventDefault();
-        showAuth(authMode === 'register' ? 'login' : 'register');
-    });
     setTimeout(() => DOM.authUsername.focus(), 100);
 }
+
+// 事件委托: 用父元素监听一次，不受 innerHTML 重建影响
+DOM.authScreen.addEventListener('click', e => {
+    if (e.target && e.target.id === 'authSwitchLink') {
+        e.preventDefault();
+        showAuth(authMode === 'register' ? 'login' : 'register');
+    }
+});
 
 function showApp() {
     DOM.authScreen.classList.add('hidden');
