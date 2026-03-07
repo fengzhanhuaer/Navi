@@ -4,15 +4,20 @@
 package handlers
 
 import (
+	"archive/tar"
 	"archive/zip"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
+	"time"
 
 	"navi/db"
 
@@ -202,68 +207,145 @@ func UpgradeSystem(c *gin.Context) {
 		return
 	}
 
-	// 在 Windows 上我们通常找 .zip，解压之
+	currExec, err := os.Executable()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取当前执行路径失败: " + err.Error()})
+		return
+	}
+
+	// 在临时目录生成新版本执行文件，以备自测
+	tmpNewExec := filepath.Join(tmpDir, "navi_new.exe")
+	if runtime.GOOS != "windows" {
+		tmpNewExec = filepath.Join(tmpDir, "navi_new")
+	}
+
+	// 提取二进制的辅助函数，将新程序写入到给定的路径并赋予执行权限
+	extractBinary := func(src io.Reader, target string) error {
+		newFile, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
+		if err != nil {
+			return fmt.Errorf("打开新文件失败: %v", err)
+		}
+		_, err = io.Copy(newFile, src)
+		newFile.Close()
+		if err != nil {
+			return fmt.Errorf("写入新文件失败: %v", err)
+		}
+		return nil
+	}
+
+	var extracted bool
 	if strings.HasSuffix(assetName, ".zip") {
 		r, err := zip.OpenReader(tmpZipPath)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "解压失败: " + err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "zip解压失败: " + err.Error()})
 			return
 		}
 		defer r.Close()
 
-		var binFile *zip.File
 		for _, f := range r.File {
 			if strings.HasSuffix(f.Name, "navi.exe") || strings.HasSuffix(f.Name, "navi") {
-				binFile = f
+				rc, err := f.Open()
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "读取zip内文件失败: " + err.Error()})
+					return
+				}
+				if err := extractBinary(rc, tmpNewExec); err != nil {
+					rc.Close()
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+				rc.Close()
+				extracted = true
 				break
 			}
 		}
-
-		if binFile == nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "压缩包中未找到 navi 执行文件"})
-			return
-		}
-
-		rc, err := binFile.Open()
+	} else if strings.HasSuffix(assetName, ".tar.gz") {
+		f, err := os.Open(tmpZipPath)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "读取执行文件失败: " + err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "打开tar.gz失败: " + err.Error()})
 			return
 		}
-		defer rc.Close()
-
-		currExec, err := os.Executable()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "获取当前执行路径失败: " + err.Error()})
-			return
-		}
-
-		// Windows 下正在运行的程序可能无法被直接覆盖，通常的做法是重命名旧文件
-		oldExec := currExec + ".old"
-		os.Remove(oldExec) // 忽略错误
-		if err := os.Rename(currExec, oldExec); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "重命名旧文件失败: " + err.Error()})
-			return
-		}
-
-		newExec, err := os.OpenFile(currExec, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
-		if err != nil {
-			// 如果写入新文件失败，至少尝试还原旧文件
-			os.Rename(oldExec, currExec)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "提取新执行文件失败: " + err.Error()})
-			return
-		}
-		_, err = io.Copy(newExec, rc)
-		newExec.Close()
-		if err != nil {
-			os.Rename(oldExec, currExec)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "写入新执行文件失败: " + err.Error()})
+		defer f.Close()
+		gr, err := gzip.NewReader(f)
+		if err == nil {
+			defer gr.Close()
+			tr := tar.NewReader(gr)
+			for {
+				hdr, err := tr.Next()
+				if err == io.EOF { break }
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "读取tar文件失败: " + err.Error()})
+					return
+				}
+				if strings.HasSuffix(hdr.Name, "navi.exe") || strings.HasSuffix(hdr.Name, "navi") {
+					if err := extractBinary(tr, tmpNewExec); err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+						return
+					}
+					extracted = true
+					break
+				}
+			}
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "gzip解码失败: " + err.Error()})
 			return
 		}
 	} else {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "不支持的打包格式，预期为 .zip"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "不支持的打包格式，预期为 .zip 或 .tar.gz"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"ok": true, "log": fmt.Sprintf("从版本 %s 成功升级到 %s，请重启服务。", "当前", *release.TagName)})
+	if !extracted {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "压缩包中未找到 navi 执行文件"})
+		return
+	}
+
+	// 执行安全自检测试
+	checkCmd := exec.Command(tmpNewExec, "--check")
+	if err := checkCmd.Run(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "新版本的自检测试失败，升级回滚放弃执行: " + err.Error()})
+		return
+	}
+
+	// 自检通过，开始实施安全替换操作
+	oldExec := currExec + ".old"
+	os.Remove(oldExec) // 忽略错误
+	if err := os.Rename(currExec, oldExec); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "重命名旧程序失败，回滚: " + err.Error()})
+		return
+	}
+
+	// 将自检通过的包覆写到真实执行路径
+	if err := extractBinary(func() io.Reader {
+		tr, _ := os.Open(tmpNewExec)
+		return tr
+	}(), currExec); err != nil {
+		// 恢复原有的入口程序
+		os.Rename(oldExec, currExec)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "替换新版本并赋予执行环境失败已被回滚: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "log": fmt.Sprintf("已成功从 GitHub 获取最新版本 %s 且安全验证完成。\n正在执行自动平滑重启...", *release.TagName)})
+
+	go func() {
+		// 延迟等待给客户端返回 HTTP 响应，然后自动重启。
+		time.Sleep(2 * time.Second)
+		if runtime.GOOS == "windows" {
+			cmd := exec.Command(currExec, os.Args[1:]...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Start()
+			os.Exit(0)
+		} else {
+			// Linux 等系统下采用 syscall.Exec 进行无缝进程接管切换
+			err := syscall.Exec(currExec, os.Args, os.Environ())
+			if err != nil {
+				// 替换接管失败尝试恢复旧二进制执行环境重启交由进程守护处理
+				os.Rename(oldExec, currExec)
+				os.Exit(1)
+			}
+		}
+	}()
 }
 

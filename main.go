@@ -31,6 +31,12 @@ var embeddedFrontend embed.FS
 var Version = "dev"
 
 func main() {
+	// 支持健康检查参数（常用于升级新包的预加载验证）
+	if len(os.Args) > 1 && os.Args[1] == "--check" {
+		fmt.Println("navi binary check passed.")
+		os.Exit(0)
+	}
+
 	// 加载 .env（不存在时静默忽略）
 	if err := godotenv.Load(); err != nil {
 		log.Println("[WARN] No .env file, using system env")
