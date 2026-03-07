@@ -120,6 +120,12 @@ body.light .top-bar {
   background: rgba(240, 242, 248, .8);
 }
 
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .logo {
   font-size: 1.1rem;
   font-weight: 600;

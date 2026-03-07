@@ -83,10 +83,6 @@ DOM.btnLogout.addEventListener('click', () => {
     location.replace('/login');
 });
 
-function showApp() {
-    DOM.appRoot.classList.remove('hidden');
-}
-
 // ── 问候语 ────────────────────────────────────
 function updateGreeting() {
     const h = new Date().getHours();
