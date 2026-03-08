@@ -100,20 +100,6 @@ function getFaviconUrl(siteUrl) {
     return `/api/favicon?url=${encodeURIComponent(siteUrl)}`;
 }
 
-// 三级降级：① 服务器缓存 → ② 站点直接 /favicon.ico → ③ 🌐
-// img 标签无 CORS 限制，内网浏览器可直接加载内网站点图标
-function faviconImgTag(siteUrl, title) {
-    let directUrl = '';
-    try {
-        const u = new URL(siteUrl.startsWith('http') ? siteUrl : 'https://' + siteUrl);
-        directUrl = u.origin + '/favicon.ico';
-    } catch { directUrl = ''; }
-    // onerror 降级：服务器缓存失败 → 尝试直接 favicon.ico → 最终 emoji
-    const onerror = directUrl
-        ? `if(this.dataset.fallback){this.parentElement.textContent='🌐'}else{this.dataset.fallback='1';this.src='${directUrl.replace(/'/g, "\\'")}';}`
-        : `this.parentElement.textContent='🌐'`;
-    return `<img src="${getFaviconUrl(siteUrl)}" alt="${title}" loading="lazy" onerror="${onerror}" />`;
-}
 
 
 // ── 搜索引擎切换 ────────────────────────────────
@@ -195,9 +181,11 @@ function renderBookmarks() {
     DOM.bookmarksSection.innerHTML = state.groups.map(group => {
         const groupSites = state.sites.filter(s => s.group_id === group.id);
         const sitesHtml = groupSites.map(site => {
-            // 用户手填 emoji → 直接显示；其他 → 三级降级图标
+            // 用户手填 emoji → 直接显示；其他 → 只从服务器缓存读取
             const isEmoji = site.icon && !site.icon.startsWith('http') && !site.icon.startsWith('/');
-            const faviconEl = isEmoji ? site.icon : faviconImgTag(site.url, site.title);
+            const faviconEl = isEmoji
+                ? site.icon
+                : `<img src="${getFaviconUrl(site.url)}" alt="${site.title}" loading="lazy" onerror="this.parentElement.textContent='🌐'" />`;
             return `
         <a class="site-card" href="${site.url}" target="_blank" data-site-id="${site.id}">
           <div class="site-favicon">${faviconEl}</div>

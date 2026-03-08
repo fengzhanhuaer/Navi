@@ -365,19 +365,6 @@ $('siteModalSave').addEventListener('click', async () => {
         }
         closeSiteModal();
         render();
-        // 如果用户未手填图标，异步在后台抽取并上传（不阻塞 UI）
-        if (!icon) {
-            fetchAndUploadFavicon(url).then(ok => {
-                if (ok) {
-                    // 刷新当前页面中对应的图标
-                    document.querySelectorAll(`.edit-site-favicon img`).forEach(img => {
-                        if (img.src.includes(encodeURIComponent(url))) {
-                            img.src = `/api/favicon?url=${encodeURIComponent(url)}&t=${Date.now()}`;
-                        }
-                    });
-                }
-            });
-        }
     } catch (e) { toast('保存失败: ' + e.message, 'error'); }
 });
 
@@ -394,40 +381,8 @@ async function loadData() {
         document.body.classList.toggle('light', theme === 'light');
 
         render();
-
-        // 加载完后，在后台为尚未缓存图标的网站补全缓存
-        warmFaviconCache();
     } catch (e) {
         $('editGroupList').innerHTML = `<p style="text-align:center;color:#ef4444;padding:40px;">加载失败: ${e.message}</p>`;
-    }
-}
-
-/**
- * 后台批量预热图标缓存
- * 对没有手填 icon 的网站，先检查服务器是否已缓存（HEAD /api/favicon），
- * 未命中则调用 fetchAndUploadFavicon 补缓存。
- * 限制并发 3 个，避免网络拥塞。
- */
-async function warmFaviconCache() {
-    // 只处理没有用户自定义图标的网站
-    const needsCache = state.sites.filter(s => !s.icon || s.icon.startsWith('/api/'));
-
-    // 并发限制：每次最多 3 个
-    const CONCURRENCY = 3;
-    for (let i = 0; i < needsCache.length; i += CONCURRENCY) {
-        const batch = needsCache.slice(i, i + CONCURRENCY);
-        await Promise.all(batch.map(async site => {
-            try {
-                // 先检查服务器是否已有缓存（不下载完整图片）
-                const check = await fetch(
-                    `/api/favicon?url=${encodeURIComponent(site.url)}`,
-                    { method: 'HEAD' }
-                );
-                if (check.ok) return; // 已缓存，跳过
-                // 未缓存，触发前端抓取上传
-                await fetchAndUploadFavicon(site.url);
-            } catch { /* 静默忽略，不影响 UI */ }
-        }));
     }
 }
 
