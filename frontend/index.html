@@ -76,6 +76,23 @@
       <section class="search-section">
         <h1 class="greeting" id="greeting">你好！</h1>
         <div class="search-box">
+          <!-- 搜索引擎选择器 -->
+          <div class="search-engine-selector" id="searchEngineSelector">
+            <button class="engine-btn" id="currentEngineBtn" title="切换搜索引擎">
+              <img id="currentEngineIcon" src="https://www.google.com/s2/favicons?domain=google.com&sz=32" alt="Google" />
+            </button>
+            <div class="engine-dropdown hidden" id="engineDropdown">
+              <button data-engine="google">
+                <img src="https://www.google.com/s2/favicons?domain=google.com&sz=32" alt="Google" /> Google
+              </button>
+              <button data-engine="bing">
+                <img src="https://www.google.com/s2/favicons?domain=bing.com&sz=32" alt="Bing" /> Bing
+              </button>
+              <button data-engine="baidu">
+                <img src="https://www.google.com/s2/favicons?domain=baidu.com&sz=32" alt="Baidu" /> 百度
+              </button>
+            </div>
+          </div>
           <input type="text" class="search-input" id="searchInput" placeholder="搜索或输入网址..." autocomplete="off"
             spellcheck="false" />
           <button class="search-btn" id="searchBtn">
