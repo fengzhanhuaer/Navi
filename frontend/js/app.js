@@ -65,17 +65,19 @@ DOM.btnLogout.addEventListener('click', () => {
 // ── 问候语 ────────────────────────────────────
 function updateGreeting() {
     const h = new Date().getHours();
+    // [text, emoji] 分开存，方便单独渲染 emoji（避免 background-clip:text 把 emoji 裁成透明）
     const greetings = [
-        [5, '凌晨好，夜猫子 🌙'],
-        [9, '早上好！☀️'],
-        [12, '上午好！🌤'],
-        [14, '午好！🍱'],
-        [18, '下午好！🍵'],
-        [22, '晚上好！🌙'],
-        [24, '深夜了，注意休息 🌛'],
+        [5,  '凌晨好，夜猫子', '🌙'],
+        [9,  '早上好！', '☀️'],
+        [12, '上午好！', '🌤'],
+        [14, '午好！', '🍱'],
+        [18, '下午好！', '🍵'],
+        [22, '晚上好！', '🌙'],
+        [24, '深夜了，注意休息', '🌛'],
     ];
     const g = greetings.find(([limit]) => h < limit) || greetings[greetings.length - 1];
-    DOM.greeting.textContent = g[1];
+    // emoji 用独立 span，CSS 会重置 -webkit-text-fill-color 让其正常渲染
+    DOM.greeting.innerHTML = `${g[1]}<span class="greeting-emoji">${g[2]}</span>`;
 }
 
 // ── 主题 ──────────────────────────────────────

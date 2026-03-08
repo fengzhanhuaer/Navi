@@ -227,6 +227,15 @@ body.edit-mode .group-actions {
   animation: fadeUp .6s ease both;
 }
 
+/* emoji 不应用 background-clip:text，否则会变透明 */
+.greeting-emoji {
+  -webkit-text-fill-color: initial;
+  background: none;
+  background-clip: unset;
+  -webkit-background-clip: unset;
+  margin-left: 4px;
+}
+
 .search-box {
   position: relative;
   display: flex;
