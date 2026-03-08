@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Navi — 系统设置</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="dark">
+  <div class="bg-layer"></div>
+  <div class="bg-overlay"></div>
+
+  <!-- 顶部工具栏 -->
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <span class="logo">🧭 Navi</span>
+    </div>
+    <div class="top-bar-right">
+      <a href="/" class="icon-btn" title="返回主页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 5l-7 7 7 7" />
+        </svg>
+      </a>
+    </div>
+  </header>
+
+  <div class="settings-page">
+    <div class="settings-page-header">
+      <h1 class="settings-page-title">⚙️ 系统设置</h1>
+    </div>
+
+    <!-- 外观 -->
+    <div class="settings-card">
+      <h3>🎨 外观</h3>
+      <div class="setting-row">
+        <span class="setting-label">主题</span>
+        <div class="setting-value">
+          <button class="btn-secondary theme-btn" id="btnDark">🌙 深色</button>
+          <button class="btn-secondary theme-btn" id="btnLight">☀️ 浅色</button>
+        </div>
+      </div>
+      <div class="setting-row" style="margin-top:12px;">
+        <span class="setting-label">背景样式</span>
+        <div class="setting-value">
+          <select id="settingBackground" class="settings-select">
+            <option value="gradient">渐变色</option>
+            <option value="dark-solid">纯深色</option>
+            <option value="light-solid">纯浅色</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 搜索引擎 -->
+    <div class="settings-card">
+      <h3>🔍 搜索引擎</h3>
+      <div class="setting-row">
+        <span class="setting-label">默认搜索引擎</span>
+        <div class="setting-value">
+          <select id="settingSearchEngine" class="settings-select">
+            <option value="google">Google</option>
+            <option value="bing">Bing</option>
+            <option value="baidu">百度</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 版本更新 -->
+    <div class="settings-card">
+      <h3>🚀 版本更新</h3>
+      <div class="setting-row">
+        <div>
+          <span class="setting-label">当前版本</span>
+          <p style="font-size:.8rem;color:var(--text-muted);margin-top:4px;" id="currentVersion">加载中...</p>
+        </div>
+        <div class="setting-value">
+          <button class="btn-primary" id="btnUpgrade">检查并升级</button>
+        </div>
+      </div>
+      <div id="upgradeLog" class="settings-logs hidden" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="js/api.js"></script>
+  <script>
+    // 未登录则跳转
+    if (!localStorage.getItem('navi_token')) {
+      location.replace('/login');
+    }
+
+    function toast(msg, type = 'info', dur = 3500) {
+      const el = document.createElement('div');
+      el.className = `toast ${type}`;
+      el.textContent = msg;
+      document.getElementById('toastContainer').appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity .3s';
+        setTimeout(() => el.remove(), 300);
+      }, dur);
+    }
+
+    // ── 主题 ──────────────────────────────
+    const savedTheme = localStorage.getItem('navi_theme') || 'dark';
+    document.body.classList.toggle('dark', savedTheme === 'dark');
+    document.body.classList.toggle('light', savedTheme === 'light');
+
+    document.getElementById('btnDark').addEventListener('click', async () => {
+      document.body.classList.replace('light', 'dark');
+      localStorage.setItem('navi_theme', 'dark');
+      try { await api.settings.set('theme', 'dark'); } catch {}
+      toast('已切换深色主题', 'success');
+    });
+    document.getElementById('btnLight').addEventListener('click', async () => {
+      document.body.classList.replace('dark', 'light');
+      localStorage.setItem('navi_theme', 'light');
+      try { await api.settings.set('theme', 'light'); } catch {}
+      toast('已切换浅色主题', 'success');
+    });
+
+    // ── 背景 ──────────────────────────────
+    const bgSel = document.getElementById('settingBackground');
+    api.settings.get('background').then(v => { if (v) bgSel.value = v; }).catch(() => {});
+    bgSel.addEventListener('change', async () => {
+      try {
+        await api.settings.set('background', bgSel.value);
+        toast('背景样式已保存', 'success');
+      } catch (e) { toast('保存失败: ' + e.message, 'error'); }
+    });
+
+    // ── 搜索引擎 ────────────────────────
+    const engineSel = document.getElementById('settingSearchEngine');
+    const savedEngine = localStorage.getItem('navi_search_engine') || 'google';
+    engineSel.value = savedEngine;
+    engineSel.addEventListener('change', () => {
+      localStorage.setItem('navi_search_engine', engineSel.value);
+      toast('搜索引擎已切换为 ' + engineSel.options[engineSel.selectedIndex].text, 'success');
+    });
+
+    // ── 版本号 ──────────────────────────
+    fetch('/health').then(r => r.json()).then(d => {
+      document.getElementById('currentVersion').textContent = d.version || 'dev';
+    }).catch(() => {
+      document.getElementById('currentVersion').textContent = 'dev';
+    });
+
+    // ── 一键升级 ────────────────────────
+    document.getElementById('btnUpgrade').addEventListener('click', async () => {
+      const btn = document.getElementById('btnUpgrade');
+      const log = document.getElementById('upgradeLog');
+      btn.disabled = true;
+      btn.textContent = '升级中...';
+      log.classList.remove('hidden');
+      log.textContent = '正在连接 GitHub，获取最新版本...\n';
+      try {
+        const res = await fetch('/api/settings/upgrade', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('navi_token')}` }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        log.textContent += data.log || '升级完成，服务正在重启...';
+        toast('升级成功，即将重启...', 'success');
+        setTimeout(() => location.replace('/'), 3000);
+      } catch (e) {
+        log.textContent += '\n错误: ' + e.message;
+        toast('升级失败: ' + e.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '检查并升级';
+      }
+    });
+  </script>
+</body>
+</html>

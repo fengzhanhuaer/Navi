@@ -193,6 +193,10 @@ func main() {
 			data, _ := embeddedFrontend.ReadFile("frontend/register.html")
 			c.Data(200, "text/html; charset=utf-8", data)
 		})
+		r.GET("/system-settings", func(c *gin.Context) {
+			data, _ := embeddedFrontend.ReadFile("frontend/system-settings.html")
+			c.Data(200, "text/html; charset=utf-8", data)
+		})
 	}
 
 	r.GET("/health", func(c *gin.Context) {
