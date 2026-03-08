@@ -179,15 +179,17 @@ function renderBookmarks() {
     DOM.bookmarksSection.innerHTML = state.groups.map(group => {
         const groupSites = state.sites.filter(s => s.group_id === group.id);
         const sitesHtml = groupSites.map(site => {
-            const faviconUrl = site.icon || getFaviconUrl(site.url);
-            const faviconEl = faviconUrl.startsWith('http')
-                ? `<img src="${faviconUrl}" alt="${site.title}" onerror="this.parentElement.textContent='🌐'" />`
-                : faviconUrl;
+            // 用户手填 emoji → 直接显示；其他（空或 URL）→ 走服务器缓存
+            const isEmoji = site.icon && !site.icon.startsWith('http') && !site.icon.startsWith('/');
+            const faviconEl = isEmoji
+                ? site.icon
+                : `<img src="${getFaviconUrl(site.url)}" alt="${site.title}" loading="lazy" onerror="this.parentElement.textContent='🌐'" />`;
             return `
         <a class="site-card" href="${site.url}" target="_blank" data-site-id="${site.id}">
           <div class="site-favicon">${faviconEl}</div>
           <span class="site-title">${site.title}</span>
         </a>`;
+
         }).join('');
 
         return `
