@@ -27,16 +27,13 @@
         <span class="logo">🧭 Navi</span>
       </div>
       <div class="top-bar-right">
-        <!-- 编辑模式 -->
-        <button class="icon-btn edit-mode-btn" id="btnEditMode" title="开启编辑">
-          <svg id="iconEdit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <!-- 编辑书签 -->
+        <a href="/edit" class="icon-btn" id="btnEdit" title="编辑书签">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
           </svg>
-          <svg id="iconDone" class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-        </button>
+        </a>
         <!-- 主题切换 -->
         <button class="icon-btn" id="btnTheme" title="切换主题">
           <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -89,7 +86,7 @@
         </div>
       </section>
 
-      <!-- 搜索引擎隐藏占位元素，展开名不影响布局 -->
+      <!-- 搜索引擎隐藏占位元素 -->
       <div style="display:none">
         <div id="searchEngineSelector">
           <button id="currentEngineBtn"><img id="currentEngineIcon" /></button>
@@ -101,82 +98,10 @@
       <section class="bookmarks-section" id="bookmarksSection">
         <!-- 动态渲染 -->
       </section>
-
-      <!-- 添加分组按钮（仅编辑模式可见） -->
-      <div class="add-group-row edit-only hidden" id="addGroupRow">
-        <button class="add-group-btn" id="btnAddGroup">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          新增分组
-        </button>
-      </div>
     </main>
 
     <!-- Toast 通知 -->
     <div class="toast-container" id="toastContainer"></div>
-
-    <!-- ── 模态框：添加/编辑网站 ── -->
-    <div class="modal-backdrop hidden" id="siteModalBackdrop">
-      <div class="modal" id="siteModal">
-        <div class="modal-header">
-          <h2 id="siteModalTitle">添加网站</h2>
-          <button class="modal-close" id="siteModalClose">✕</button>
-        </div>
-        <form id="siteForm">
-          <input type="hidden" id="siteId" />
-          <div class="form-group">
-            <label>网站名称</label>
-            <input type="text" id="siteTitle" placeholder="例：GitHub" required />
-          </div>
-          <div class="form-group">
-            <label>网站地址</label>
-            <input type="url" id="siteUrl" placeholder="https://..." required />
-          </div>
-          <div class="form-group">
-            <label>图标（选填，留空自动获取 favicon）</label>
-            <input type="text" id="siteIcon" placeholder="emoji 或图标 URL" />
-          </div>
-          <div class="form-group">
-            <label>所属分组</label>
-            <select id="siteGroupId"></select>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn-secondary" id="siteModalCancel">取消</button>
-            <button type="submit" class="btn-primary">保存</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- ── 模态框：添加/编辑分组 ── -->
-    <div class="modal-backdrop hidden" id="groupModalBackdrop">
-      <div class="modal" id="groupModal">
-        <div class="modal-header">
-          <h2 id="groupModalTitle">新建分组</h2>
-          <button class="modal-close" id="groupModalClose">✕</button>
-        </div>
-        <form id="groupForm">
-          <input type="hidden" id="groupId" />
-          <div class="form-group">
-            <label>分组名称</label>
-            <input type="text" id="groupName" placeholder="例：工具网站" required />
-          </div>
-          <div class="form-group">
-            <label>图标（emoji）</label>
-            <input type="text" id="groupIcon" placeholder="📁" maxlength="4" />
-            <div class="emoji-picker" id="emojiPicker">
-              <!-- 这里将由 JS 动态渲染预设 emoji -->
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn-secondary" id="groupModalCancel">取消</button>
-            <button type="submit" class="btn-primary">保存</button>
-          </div>
-        </form>
-      </div>
-    </div>
 
     <!-- 系统设置已移至独立页面 /system-settings，保留隐藏占位避免 JS 报 null -->
     <div style="display:none" id="settingsModalBackdrop">

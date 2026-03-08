@@ -7,32 +7,12 @@ const state = {
     groups: [],
     sites: [],
     settings: {},
-    editingGroupId: null,
 };
-
-// ── 编辑模式 ──────────────────────────────────
-let editMode = false;
-
-function applyEditMode() {
-    document.body.classList.toggle('edit-mode', editMode);
-    if (DOM.iconEdit) DOM.iconEdit.classList.toggle('hidden', editMode);
-    if (DOM.iconDone) DOM.iconDone.classList.toggle('hidden', !editMode);
-    if (DOM.btnEditMode) {
-        DOM.btnEditMode.title = editMode ? '完成编辑' : '开启编辑';
-        DOM.btnEditMode.classList.toggle('active', editMode);
-    }
-    const addGroupRow = document.getElementById('addGroupRow');
-    if (addGroupRow) addGroupRow.classList.toggle('hidden', !editMode);
-    renderBookmarks();
-    if (editMode) toast('编辑模式已开启，可添加/修改/移动内容', 'info', 2000);
-    else toast('已退出编辑模式', 'info', 1500);
-}
 
 // ── DOM 引用 ──────────────────────────────────
 const $ = id => document.getElementById(id);
 
 const DOM = {
-    // 主应用
     appRoot: $('appRoot'),
     greeting: $('greeting'),
     searchEngineSelector: $('searchEngineSelector'),
@@ -47,29 +27,7 @@ const DOM = {
     iconMoon: $('iconMoon'),
     btnSettings: $('btnSettings'),
     btnLogout: $('btnLogout'),
-    btnEditMode: $('btnEditMode'),
-    iconEdit: $('iconEdit'),
-    iconDone: $('iconDone'),
     toastContainer: $('toastContainer'),
-
-    // Site modal
-    siteModalBackdrop: $('siteModalBackdrop'),
-    siteModalTitle: $('siteModalTitle'),
-    siteForm: $('siteForm'),
-    siteId: $('siteId'),
-    siteTitle: $('siteTitle'),
-    siteUrl: $('siteUrl'),
-    siteIcon: $('siteIcon'),
-    siteGroupId: $('siteGroupId'),
-
-    // Group modal
-    groupModalBackdrop: $('groupModalBackdrop'),
-    groupModalTitle: $('groupModalTitle'),
-    groupForm: $('groupForm'),
-    groupId: $('groupId'),
-    groupName: $('groupName'),
-    groupIcon: $('groupIcon'),
-    emojiPicker: $('emojiPicker'),
 
     // Settings modal (hidden placeholder elements)
     settingsModalBackdrop: $('settingsModalBackdrop'),
@@ -103,14 +61,6 @@ DOM.btnLogout.addEventListener('click', () => {
     localStorage.removeItem('navi_token');
     location.replace('/login');
 });
-
-// ── 编辑模式切换 ──────────────────────────────
-if (DOM.btnEditMode) {
-    DOM.btnEditMode.addEventListener('click', () => {
-        editMode = !editMode;
-        applyEditMode();
-    });
-}
 
 // ── 问候语 ────────────────────────────────────
 function updateGreeting() {
@@ -173,10 +123,8 @@ function setEngine(engineKey) {
     DOM.searchInput.focus();
 }
 
-// 初始化搜索引擎图标
 setEngine(currentEngine);
 
-// 切换下拉菜单
 if (DOM.currentEngineBtn) {
     DOM.currentEngineBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -184,7 +132,6 @@ if (DOM.currentEngineBtn) {
     });
 }
 
-// 选择引擎
 if (DOM.engineDropdown) {
     DOM.engineDropdown.querySelectorAll('.engine-option').forEach(opt => {
         opt.addEventListener('click', (e) => {
@@ -194,7 +141,6 @@ if (DOM.engineDropdown) {
     });
 }
 
-// 点击外部关闭下拉菜单
 document.addEventListener('click', e => {
     if (DOM.searchEngineSelector && !DOM.searchEngineSelector.contains(e.target)) {
         if (DOM.engineDropdown) DOM.engineDropdown.classList.add('hidden');
@@ -222,12 +168,12 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// ── 书签渲染 ──────────────────────────────────
+// ── 书签渲染（只读，无操作按钮）─────────────────
 function renderBookmarks() {
     if (!state.groups.length) {
         DOM.bookmarksSection.innerHTML = `
       <p style="text-align:center;color:var(--text-muted);padding:40px;">
-        ${editMode ? '还没有任何分组，点击下方「新增分组」开始吧！' : '还没有任何分组，点击右上角✏️开启编辑后添加'}
+        还没有任何分组，<a href="/edit" style="color:var(--accent-1);text-decoration:none;">点击这里</a> 开始添加吧！
       </p>`;
         return;
     }
@@ -239,33 +185,19 @@ function renderBookmarks() {
             const faviconEl = faviconUrl.startsWith('http')
                 ? `<img src="${faviconUrl}" alt="${site.title}" onerror="this.parentElement.textContent='🌐'" />`
                 : faviconUrl;
-            const siteEditBtns = editMode ? `
-          <div class="site-actions">
-            <button class="action-btn-xs btn-edit-site" data-id="${site.id}" title="编辑">✏️</button>
-            <button class="action-btn-xs btn-del-site"  data-id="${site.id}" title="删除">🗑</button>
-          </div>` : '';
             return `
         <a class="site-card" href="${site.url}" target="_blank" data-site-id="${site.id}">
           <div class="site-favicon">${faviconEl}</div>
           <span class="site-title">${site.title}</span>
-          ${siteEditBtns}
         </a>`;
         }).join('');
 
-        const groupEditActions = editMode ? `
-          <div class="group-actions">
-            <button class="group-action-btn btn-add-site"  data-gid="${group.id}" title="添加网站">➕</button>
-            <button class="group-action-btn btn-edit-group" data-id="${group.id}"  title="编辑分组">✏️</button>
-            <button class="group-action-btn danger btn-del-group" data-id="${group.id}" title="删除分组">🗑</button>
-          </div>` : '';
-
         return `
       <div class="group-card ${group.collapsed ? 'collapsed' : ''}" data-group-id="${group.id}">
-        <div class="group-header">
+        <div class="group-header" data-collapse-gid="${group.id}">
           <span class="group-icon">${group.icon || '📁'}</span>
           <span class="group-name">${group.name}</span>
           <span class="group-count">${groupSites.length}</span>
-          ${groupEditActions}
           <span class="group-collapse-icon">▾</span>
         </div>
         <div class="sites-grid">
@@ -274,262 +206,22 @@ function renderBookmarks() {
       </div>`;
     }).join('');
 
-    bindBookmarkEvents();
-    initSortable();
+    bindCollapseEvents();
 }
 
-// ── 拖拽排序逻辑 ──────────────────────────────────
-function initSortable() {
-    if (typeof Sortable === 'undefined') return;
-
-    // 1. 分组拖拽（仅编辑模式）
-    Sortable.create(DOM.bookmarksSection, {
-        animation: 150,
-        handle: '.group-header',
-        ghostClass: 'sortable-ghost',
-        disabled: !editMode,
-        onEnd: async function () {
-            const groupCards = DOM.bookmarksSection.querySelectorAll('.group-card');
-            const items = Array.from(groupCards).map((el, index) => ({
-                id: parseInt(el.dataset.groupId),
-                order: index
-            }));
-            
-            items.forEach(item => {
-                const g = state.groups.find(x => x.id === item.id);
-                if (g) g.order_index = item.order;
-            });
-            state.groups.sort((a, b) => a.order_index - b.order_index);
-
-            try {
-                await api.groups.reorder(items);
-            } catch (e) {
-                toast('分组排序保存失败: ' + e.message, 'error');
-                loadApp();
-            }
-        }
-    });
-
-    // 2. 书签网站拖拽（跨组，仅编辑模式）
-    document.querySelectorAll('.sites-grid').forEach(grid => {
-        Sortable.create(grid, {
-            group: 'shared-sites',
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            disabled: !editMode,
-            onEnd: async function (evt) {
-                const siteId = parseInt(evt.item.dataset.siteId);
-                const newGroupId = parseInt(evt.to.closest('.group-card').dataset.groupId);
-                const oldGroupId = parseInt(evt.from.closest('.group-card').dataset.groupId);
-                
-                const s = state.sites.find(x => x.id === siteId);
-                if (!s) return;
-
-                if (newGroupId !== oldGroupId) {
-                    s.group_id = newGroupId;
-                    try {
-                        await api.sites.update(siteId, {
-                            group_id: newGroupId,
-                            title: s.title,
-                            url: s.url,
-                            icon: s.icon
-                        });
-                    } catch (e) {
-                        toast('跨组移动失败: ' + e.message, 'error');
-                        loadApp();
-                        return;
-                    }
-                }
-
-                const siteCards = evt.to.querySelectorAll('.site-card');
-                const items = Array.from(siteCards).map((el, index) => ({
-                    id: parseInt(el.dataset.siteId),
-                    order: index,
-                    group_id: newGroupId,
-                }));
-
-                try {
-                    await api.sites.reorder(items);
-                } catch (e) {
-                    toast('网站排序保存失败: ' + e.message, 'error');
-                }
-            }
-        });
-    });
-}
-
-function bindBookmarkEvents() {
+function bindCollapseEvents() {
     DOM.bookmarksSection.querySelectorAll('.group-header').forEach(el => {
-        el.addEventListener('click', async e => {
-            if (e.target.closest('.group-actions') || e.target.closest('.btn-add-site')) return;
-            const card = el.closest('.group-card');
-            const gid = parseInt(card.dataset.groupId);
+        el.addEventListener('click', async () => {
+            const gid = parseInt(el.dataset.collapseGid);
             const group = state.groups.find(g => g.id === gid);
             if (!group) return;
             group.collapsed = !group.collapsed;
+            const card = el.closest('.group-card');
             card.classList.toggle('collapsed', group.collapsed);
             try { await api.groups.update(gid, { name: group.name, icon: group.icon, collapsed: group.collapsed }); } catch { }
         });
     });
-
-    DOM.bookmarksSection.querySelectorAll('.btn-add-site').forEach(el => {
-        el.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openSiteModal(null, parseInt(el.dataset.gid)); });
-    });
-
-    DOM.bookmarksSection.querySelectorAll('.btn-edit-site').forEach(el => {
-        el.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openSiteModal(parseInt(el.dataset.id)); });
-    });
-
-    DOM.bookmarksSection.querySelectorAll('.btn-del-site').forEach(el => {
-        el.addEventListener('click', async e => {
-            e.preventDefault(); e.stopPropagation();
-            if (!confirm('确定删除这个网站吗？')) return;
-            try {
-                await api.sites.delete(parseInt(el.dataset.id));
-                state.sites = state.sites.filter(s => s.id !== parseInt(el.dataset.id));
-                renderBookmarks();
-                toast('已删除', 'info');
-            } catch (err) { toast('删除失败: ' + err.message, 'error'); }
-        });
-    });
-
-    DOM.bookmarksSection.querySelectorAll('.btn-edit-group').forEach(el => {
-        el.addEventListener('click', e => { e.stopPropagation(); openGroupModal(parseInt(el.dataset.id)); });
-    });
-
-    DOM.bookmarksSection.querySelectorAll('.btn-del-group').forEach(el => {
-        el.addEventListener('click', async e => {
-            e.stopPropagation();
-            if (!confirm('删除分组将同时删除其中所有网站，确定吗？')) return;
-            const gid = parseInt(el.dataset.id);
-            try {
-                await api.groups.delete(gid);
-                state.groups = state.groups.filter(g => g.id !== gid);
-                state.sites = state.sites.filter(s => s.group_id !== gid);
-                renderBookmarks();
-                toast('分组已删除', 'info');
-            } catch (err) { toast('删除失败: ' + err.message, 'error'); }
-        });
-    });
 }
-
-// ── 分组模态框 ────────────────────────────────
-const PRESET_EMOJIS = [
-    '📁', '⭐️', '📚', '💼', '🎮', '🛠️', '🎵', '📺', '🛍️', '💡', '💰', '🚀', '🧠', '☁️', '🔥',
-    '💻', '📱', '🎨', '📝', '🔗', '📰', '🕹️', '✉️', '📅', '🗑️', '🔍', '⚙️', '🔒', '🔑', '🌍'
-];
-
-function initEmojiPicker() {
-    if (DOM.emojiPicker.children.length === 0) {
-        DOM.emojiPicker.innerHTML = PRESET_EMOJIS.map(e => 
-            `<button type="button" class="emoji-btn">${e}</button>`
-        ).join('');
-        
-        DOM.emojiPicker.addEventListener('click', e => {
-            if (e.target.classList.contains('emoji-btn')) {
-                DOM.groupIcon.value = e.target.textContent;
-            }
-        });
-    }
-}
-
-function openGroupModal(groupId = null) {
-    state.editingGroupId = groupId;
-    if (groupId) {
-        const g = state.groups.find(g => g.id === groupId);
-        DOM.groupModalTitle.textContent = '编辑分组';
-        DOM.groupId.value = groupId;
-        DOM.groupName.value = g.name;
-        DOM.groupIcon.value = g.icon || '📁';
-    } else {
-        DOM.groupModalTitle.textContent = '新建分组';
-        DOM.groupId.value = '';
-        DOM.groupForm.reset();
-        DOM.groupIcon.value = '📁';
-    }
-    initEmojiPicker();
-    DOM.groupModalBackdrop.classList.remove('hidden');
-    DOM.groupName.focus();
-}
-
-function closeGroupModal() { DOM.groupModalBackdrop.classList.add('hidden'); state.editingGroupId = null; }
-
-DOM.groupForm.addEventListener('submit', async e => {
-    e.preventDefault();
-    const name = DOM.groupName.value.trim();
-    const icon = DOM.groupIcon.value.trim() || '📁';
-    try {
-        if (state.editingGroupId) {
-            const g = state.groups.find(g => g.id === state.editingGroupId);
-            await api.groups.update(state.editingGroupId, { name, icon, collapsed: g.collapsed });
-            g.name = name; g.icon = icon;
-            toast('分组已更新', 'success');
-        } else {
-            const { id } = await api.groups.create(name, icon);
-            state.groups.push({ id, name, icon, order_index: state.groups.length, collapsed: false });
-            toast('分组已创建', 'success');
-        }
-        closeGroupModal(); renderBookmarks();
-    } catch (err) { toast('保存失败: ' + err.message, 'error'); }
-});
-
-$('btnAddGroup').addEventListener('click', () => openGroupModal(null));
-$('groupModalClose').addEventListener('click', closeGroupModal);
-$('groupModalCancel').addEventListener('click', closeGroupModal);
-DOM.groupModalBackdrop.addEventListener('click', e => { if (e.target === DOM.groupModalBackdrop) closeGroupModal(); });
-
-// ── 网站模态框 ────────────────────────────────
-function openSiteModal(siteId = null, defaultGroupId = null) {
-    DOM.siteGroupId.innerHTML = state.groups.map(g =>
-        `<option value="${g.id}">${g.icon} ${g.name}</option>`
-    ).join('');
-
-    if (siteId) {
-        const s = state.sites.find(s => s.id === siteId);
-        DOM.siteModalTitle.textContent = '编辑网站';
-        DOM.siteId.value = siteId;
-        DOM.siteTitle.value = s.title;
-        DOM.siteUrl.value = s.url;
-        DOM.siteIcon.value = s.icon || '';
-        DOM.siteGroupId.value = s.group_id;
-    } else {
-        DOM.siteModalTitle.textContent = '添加网站';
-        DOM.siteId.value = '';
-        DOM.siteForm.reset();
-        if (defaultGroupId) DOM.siteGroupId.value = defaultGroupId;
-    }
-    DOM.siteModalBackdrop.classList.remove('hidden');
-    DOM.siteTitle.focus();
-}
-
-function closeSiteModal() { DOM.siteModalBackdrop.classList.add('hidden'); }
-
-DOM.siteForm.addEventListener('submit', async e => {
-    e.preventDefault();
-    const siteId = DOM.siteId.value ? parseInt(DOM.siteId.value) : null;
-    const data = {
-        title: DOM.siteTitle.value.trim(),
-        url: DOM.siteUrl.value.trim(),
-        icon: DOM.siteIcon.value.trim(),
-        group_id: parseInt(DOM.siteGroupId.value),
-    };
-    try {
-        if (siteId) {
-            await api.sites.update(siteId, data);
-            Object.assign(state.sites.find(s => s.id === siteId), data);
-            toast('已更新', 'success');
-        } else {
-            const { id } = await api.sites.create(data);
-            state.sites.push({ ...data, id, order_index: 0 });
-            toast('网站已添加', 'success');
-        }
-        closeSiteModal(); renderBookmarks();
-    } catch (err) { toast('保存失败: ' + err.message, 'error'); }
-});
-
-$('siteModalClose').addEventListener('click', closeSiteModal);
-$('siteModalCancel').addEventListener('click', closeSiteModal);
-DOM.siteModalBackdrop.addEventListener('click', e => { if (e.target === DOM.siteModalBackdrop) closeSiteModal(); });
 
 // ── 背景 ──────────────────────────────────────
 function applyBackground(bg) { document.body.dataset.bg = bg; }

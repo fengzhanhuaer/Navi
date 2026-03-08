@@ -180,6 +180,7 @@ func main() {
 		r.StaticFile("/settings", frontendDir2+"/settings.html")
 		r.StaticFile("/login", frontendDir2+"/login.html")
 		r.StaticFile("/register", frontendDir2+"/register.html")
+		r.StaticFile("/edit", frontendDir2+"/edit.html")
 	} else {
 		r.GET("/settings", func(c *gin.Context) {
 			data, _ := embeddedFrontend.ReadFile("frontend/settings.html")
@@ -195,6 +196,10 @@ func main() {
 		})
 		r.GET("/system-settings", func(c *gin.Context) {
 			data, _ := embeddedFrontend.ReadFile("frontend/system-settings.html")
+			c.Data(200, "text/html; charset=utf-8", data)
+		})
+		r.GET("/edit", func(c *gin.Context) {
+			data, _ := embeddedFrontend.ReadFile("frontend/edit.html")
 			c.Data(200, "text/html; charset=utf-8", data)
 		})
 	}

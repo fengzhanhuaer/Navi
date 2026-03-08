@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Navi — 编辑书签</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    /* ── 编辑页专属样式 ── */
+    .edit-page {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 80px 24px 60px;
+    }
+
+    .edit-page-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* 工具栏 */
+    .edit-toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    /* 编辑分组卡片 */
+    .edit-group-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .edit-group-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      background: var(--surface-hover);
+      border-bottom: 1px solid var(--border);
+      cursor: grab;
+      user-select: none;
+    }
+
+    .edit-group-header:active {
+      cursor: grabbing;
+    }
+
+    .edit-drag-handle {
+      color: var(--text-muted);
+      font-size: 1rem;
+      cursor: grab;
+      flex-shrink: 0;
+    }
+
+    .edit-group-icon {
+      font-size: 1.1rem;
+    }
+
+    .edit-group-name {
+      flex: 1;
+      font-size: .95rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .edit-group-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    /* 网站列表 */
+    .edit-sites-list {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 42px;
+    }
+
+    .edit-site-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      transition: all var(--transition);
+      background: var(--surface);
+      cursor: grab;
+    }
+
+    .edit-site-row:hover {
+      border-color: var(--border);
+      background: var(--surface-hover);
+    }
+
+    .edit-site-favicon {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--surface-active);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .9rem;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .edit-site-favicon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .edit-site-name {
+      flex: 1;
+      font-size: .88rem;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .edit-site-url {
+      font-size: .75rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+    }
+
+    .edit-site-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .edit-btn {
+      height: 28px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: .78rem;
+      font-family: var(--font);
+      transition: all var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .edit-btn:hover {
+      background: var(--surface-hover);
+      color: var(--text-primary);
+      border-color: var(--border-strong);
+    }
+
+    .edit-btn.danger:hover {
+      background: rgba(239, 68, 68, .1);
+      color: #ef4444;
+      border-color: rgba(239, 68, 68, .4);
+    }
+
+    .edit-btn.primary {
+      background: var(--accent-grad);
+      color: white;
+      border-color: transparent;
+    }
+
+    .edit-btn.primary:hover {
+      box-shadow: 0 2px 12px rgba(99, 102, 241, .35);
+    }
+
+    .edit-add-site-row {
+      margin: 8px 12px 12px;
+    }
+
+    .empty-group-hint {
+      padding: 12px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: .85rem;
+    }
+
+    /* 拖拽幽灵 */
+    .sortable-ghost {
+      opacity: .4;
+    }
+
+    /* 模态框 */
+    .simple-modal {
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 20px 60px rgba(0,0,0,.4);
+      width: 100%;
+      max-width: 440px;
+      overflow: hidden;
+    }
+
+    .simple-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .simple-modal-header h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .simple-modal-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .simple-modal-footer {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      padding: 12px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .field-group label {
+      font-size: .82rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .field-group input,
+    .field-group select {
+      height: 38px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-hover);
+      color: var(--text-primary);
+      font-family: var(--font);
+      font-size: .9rem;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+
+    .field-group input:focus,
+    .field-group select:focus {
+      border-color: var(--accent-1);
+      box-shadow: 0 0 0 3px rgba(99,102,241,.12);
+    }
+
+    .field-group select option {
+      background: #1a1b2e;
+    }
+
+    body.light .field-group select option {
+      background: #fff;
+    }
+
+    /* emoji 选择器 */
+    .edit-emoji-picker {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 6px;
+    }
+
+    .edit-emoji-picker button {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all .15s;
+    }
+
+    .edit-emoji-picker button:hover {
+      background: var(--surface-hover);
+      border-color: var(--accent-1);
+      transform: scale(1.1);
+    }
+
+    /* 加载状态 */
+    .edit-loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+
+<body class="dark">
+  <div class="bg-layer"></div>
+  <div class="bg-overlay"></div>
+
+  <!-- 顶部工具栏 -->
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <span class="logo">🧭 Navi</span>
+    </div>
+    <div class="top-bar-right">
+      <a href="/" class="icon-btn" title="返回主页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 5l-7 7 7 7" />
+        </svg>
+      </a>
+    </div>
+  </header>
+
+  <!-- 主内容 -->
+  <div class="edit-page">
+    <div class="edit-page-title">✏️ 编辑书签</div>
+
+    <!-- 工具栏 -->
+    <div class="edit-toolbar">
+      <button class="edit-btn primary" id="btnAddGroup">➕ 新建分组</button>
+    </div>
+
+    <!-- 分组列表（动态渲染） -->
+    <div id="editGroupList">
+      <div class="edit-loading">加载中...</div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ── 分组模态框 ── -->
+  <div class="modal-backdrop hidden" id="groupModal">
+    <div class="simple-modal">
+      <div class="simple-modal-header">
+        <h2 id="groupModalTitle">新建分组</h2>
+        <button class="modal-close" id="groupModalClose">✕</button>
+      </div>
+      <div class="simple-modal-body">
+        <input type="hidden" id="groupId" />
+        <div class="field-group">
+          <label>分组名称</label>
+          <input type="text" id="groupName" placeholder="例：工具网站" required />
+        </div>
+        <div class="field-group">
+          <label>图标（emoji）</label>
+          <input type="text" id="groupIcon" placeholder="📁" maxlength="4" />
+          <div class="edit-emoji-picker" id="emojiPicker"></div>
+        </div>
+      </div>
+      <div class="simple-modal-footer">
+        <button class="edit-btn" id="groupModalCancel">取消</button>
+        <button class="edit-btn primary" id="groupModalSave">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 网站模态框 ── -->
+  <div class="modal-backdrop hidden" id="siteModal">
+    <div class="simple-modal">
+      <div class="simple-modal-header">
+        <h2 id="siteModalTitle">添加网站</h2>
+        <button class="modal-close" id="siteModalClose">✕</button>
+      </div>
+      <div class="simple-modal-body">
+        <input type="hidden" id="siteId" />
+        <div class="field-group">
+          <label>网站名称</label>
+          <input type="text" id="siteTitle" placeholder="例：GitHub" required />
+        </div>
+        <div class="field-group">
+          <label>网站地址</label>
+          <input type="url" id="siteUrl" placeholder="https://..." required />
+        </div>
+        <div class="field-group">
+          <label>图标（选填，留空自动获取 favicon）</label>
+          <input type="text" id="siteIcon" placeholder="emoji 或图标 URL" />
+        </div>
+        <div class="field-group">
+          <label>所属分组</label>
+          <select id="siteGroupId"></select>
+        </div>
+      </div>
+      <div class="simple-modal-footer">
+        <button class="edit-btn" id="siteModalCancel">取消</button>
+        <button class="edit-btn primary" id="siteModalSave">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/edit.js"></script>
+</body>
+
+</html>
