@@ -19,6 +19,24 @@
       <span class="logo">🧭 Navi</span>
     </div>
     <div class="top-bar-right">
+      <!-- 主题切换 -->
+      <button class="icon-btn" id="btnTheme" title="切换主题">
+        <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5" />
+          <line x1="12" y1="1" x2="12" y2="3" />
+          <line x1="12" y1="21" x2="12" y2="23" />
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+          <line x1="1" y1="12" x2="3" y2="12" />
+          <line x1="21" y1="12" x2="23" y2="12" />
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+        </svg>
+        <svg id="iconMoon" class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+      </button>
+      <!-- 返回主页 -->
       <a href="/" class="icon-btn" title="返回主页">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M19 12H5M12 5l-7 7 7 7" />
@@ -32,29 +50,7 @@
       <h1 class="settings-page-title">⚙️ 系统设置</h1>
     </div>
 
-    <!-- 外观 -->
-    <div class="settings-card">
-      <h3>🎨 外观</h3>
-      <div class="setting-row">
-        <span class="setting-label">主题</span>
-        <div class="setting-value">
-          <button class="btn-secondary theme-btn" id="btnDark">🌙 深色</button>
-          <button class="btn-secondary theme-btn" id="btnLight">☀️ 浅色</button>
-        </div>
-      </div>
-      <div class="setting-row" style="margin-top:12px;">
-        <span class="setting-label">背景样式</span>
-        <div class="setting-value">
-          <select id="settingBackground" class="settings-select">
-            <option value="gradient">渐变色</option>
-            <option value="dark-solid">纯深色</option>
-            <option value="light-solid">纯浅色</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <!-- 搜索引擎 -->
+    <!-- ── 偏好 ── -->
     <div class="settings-card">
       <h3>🔍 搜索引擎</h3>
       <div class="setting-row">
@@ -69,7 +65,68 @@
       </div>
     </div>
 
-    <!-- 版本更新 -->
+    <!-- ── Cloudflare D1 连接状态 ── -->
+    <div class="settings-card">
+      <h3>☁️ Cloudflare D1 备份</h3>
+      <div class="setting-row">
+        <span class="setting-label">D1 连接</span>
+        <span class="setting-value"><span id="d1StatusBadge" class="status-badge">检测中...</span></span>
+      </div>
+      <div class="setting-row" id="rowAccountId" style="display:none">
+        <span class="setting-label">Account ID</span>
+        <span class="setting-value" id="d1AccountId" style="font-family:monospace;font-size:.82rem;"></span>
+      </div>
+      <div class="setting-row" id="rowDatabaseId" style="display:none">
+        <span class="setting-label">数据库名</span>
+        <span class="setting-value" id="d1DatabaseName" style="font-family:monospace;font-size:.82rem;">navi</span>
+      </div>
+    </div>
+
+    <!-- ── API Token 配置 ── -->
+    <div class="settings-card">
+      <h3>🔑 配置 API Token</h3>
+      <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px;">
+        输入你的 Cloudflare API Token，系统将自动匹配账户并在 D1 中查找或创建名为
+        <code style="background:var(--surface-active);padding:2px 6px;border-radius:4px;">navi</code>
+        的数据库。<br/>
+        <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank"
+          style="color:var(--accent-1);font-size:.82rem;text-decoration:none;">
+          → 如何获取 API Token？
+        </a>
+      </p>
+      <div class="auth-field" style="margin-bottom:14px;">
+        <label for="apiTokenInput">Cloudflare API Token</label>
+        <input type="password" id="apiTokenInput" placeholder="粘贴你的 API Token" autocomplete="off" />
+      </div>
+      <div id="configureError" style="font-size:.83rem;color:#ef4444;min-height:20px;margin-bottom:8px;"></div>
+      <div class="settings-actions">
+        <button class="btn-primary" id="btnConfigure">🔗 连接 D1</button>
+        <button class="btn-secondary" id="btnRevealToken" title="显示/隐藏" style="width:38px;padding:0;">👁</button>
+      </div>
+    </div>
+
+    <!-- ── 数据同步 ── -->
+    <div class="settings-card">
+      <h3>🔄 数据同步</h3>
+      <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px;" id="syncDesc">
+        配置 D1 后，可手动将本地数据推送到 Cloudflare D1，或从 D1 拉取数据到本地。
+      </p>
+      <div class="settings-actions">
+        <button class="btn-primary" id="btnSync" disabled>⬆️ 推送到 D1</button>
+        <button class="btn-danger" id="btnRestore" disabled>⬇️ 从 D1 拉取</button>
+      </div>
+      <div id="syncHint" style="font-size:.82rem;color:var(--text-muted);margin-top:10px;">请先配置 API Token 以启用同步功能</div>
+    </div>
+
+    <!-- ── 同步日志 ── -->
+    <div class="settings-card">
+      <h3>📋 同步日志</h3>
+      <div class="settings-logs" id="syncLogs">
+        <div style="padding:12px 16px;color:var(--text-muted);">暂无记录</div>
+      </div>
+    </div>
+
+    <!-- ── 版本更新 ── -->
     <div class="settings-card">
       <h3>🚀 版本更新</h3>
       <div class="setting-row">
@@ -106,56 +163,135 @@
       }, dur);
     }
 
-    // ── 主题 ──────────────────────────────
+    // ── 主题切换 ──────────────────────────────
     const savedTheme = localStorage.getItem('navi_theme') || 'dark';
     document.body.classList.toggle('dark', savedTheme === 'dark');
     document.body.classList.toggle('light', savedTheme === 'light');
+    document.getElementById('iconSun').classList.toggle('hidden', savedTheme === 'dark');
+    document.getElementById('iconMoon').classList.toggle('hidden', savedTheme === 'light');
 
-    document.getElementById('btnDark').addEventListener('click', async () => {
-      document.body.classList.replace('light', 'dark');
-      localStorage.setItem('navi_theme', 'dark');
-      try { await api.settings.set('theme', 'dark'); } catch {}
-      toast('已切换深色主题', 'success');
-    });
-    document.getElementById('btnLight').addEventListener('click', async () => {
-      document.body.classList.replace('dark', 'light');
-      localStorage.setItem('navi_theme', 'light');
-      try { await api.settings.set('theme', 'light'); } catch {}
-      toast('已切换浅色主题', 'success');
-    });
-
-    // ── 背景 ──────────────────────────────
-    const bgSel = document.getElementById('settingBackground');
-    api.settings.get('background').then(v => { if (v) bgSel.value = v; }).catch(() => {});
-    bgSel.addEventListener('change', async () => {
-      try {
-        await api.settings.set('background', bgSel.value);
-        toast('背景样式已保存', 'success');
-      } catch (e) { toast('保存失败: ' + e.message, 'error'); }
+    document.getElementById('btnTheme').addEventListener('click', async () => {
+      const isDark = document.body.classList.contains('dark');
+      const next = isDark ? 'light' : 'dark';
+      document.body.classList.toggle('dark', next === 'dark');
+      document.body.classList.toggle('light', next === 'light');
+      document.getElementById('iconSun').classList.toggle('hidden', next === 'dark');
+      document.getElementById('iconMoon').classList.toggle('hidden', next === 'light');
+      localStorage.setItem('navi_theme', next);
+      try { await api.settings.set('theme', next); } catch {}
     });
 
-    // ── 搜索引擎 ────────────────────────
+    // ── 搜索引擎 ────────────────────────────
     const engineSel = document.getElementById('settingSearchEngine');
-    const savedEngine = localStorage.getItem('navi_search_engine') || 'google';
-    engineSel.value = savedEngine;
+    engineSel.value = localStorage.getItem('navi_search_engine') || 'google';
     engineSel.addEventListener('change', () => {
       localStorage.setItem('navi_search_engine', engineSel.value);
       toast('搜索引擎已切换为 ' + engineSel.options[engineSel.selectedIndex].text, 'success');
     });
 
-    // ── 版本号 ──────────────────────────
+    // ── 版本号 ──────────────────────────────
     fetch('/health').then(r => r.json()).then(d => {
       document.getElementById('currentVersion').textContent = d.version || 'dev';
     }).catch(() => {
       document.getElementById('currentVersion').textContent = 'dev';
     });
 
-    // ── 一键升级 ────────────────────────
+    // ── 显示/隐藏 token ──────────────────────
+    document.getElementById('btnRevealToken').addEventListener('click', () => {
+      const inp = document.getElementById('apiTokenInput');
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    });
+
+    // ── D1 状态 ─────────────────────────────
+    async function loadStatus() {
+      try {
+        const s = await api.sync.status();
+        const badge = document.getElementById('d1StatusBadge');
+        if (s.status === 'ok') {
+          badge.textContent = '✅ 已连接';
+          badge.className = 'status-badge ok';
+          document.getElementById('btnSync').disabled = false;
+          document.getElementById('btnRestore').disabled = false;
+          document.getElementById('syncHint').textContent = '';
+          document.getElementById('syncDesc').textContent = '可手动推送本地数据到 D1，或从 D1 拉取最新数据覆盖本地。';
+          if (s.account_id) {
+            document.getElementById('d1AccountId').textContent = s.account_id;
+            document.getElementById('rowAccountId').style.display = '';
+            document.getElementById('rowDatabaseId').style.display = '';
+          }
+        } else if (s.status === 'not_configured') {
+          badge.textContent = '⚠️ 未配置';
+          badge.className = 'status-badge not_configured';
+        } else {
+          badge.textContent = '❌ 连接错误';
+          badge.className = 'status-badge error';
+        }
+      } catch {
+        document.getElementById('d1StatusBadge').textContent = '❌ 请求失败';
+        document.getElementById('d1StatusBadge').className = 'status-badge error';
+      }
+    }
+
+    async function loadLogs() {
+      try {
+        const logs = await api.sync.logs();
+        const el = document.getElementById('syncLogs');
+        if (!logs || logs.length === 0) {
+          el.innerHTML = '<div style="padding:12px 16px;color:var(--text-muted);">暂无同步记录</div>';
+          return;
+        }
+        el.innerHTML = logs.map(l => `
+          <div class="log-item">
+            <span class="${l.status === 'ok' ? 'ls-ok' : 'ls-error'}">${l.status}</span>
+            <span>${l.synced_at}</span>
+            <span style="flex:1">${l.message}</span>
+          </div>`).join('');
+      } catch {}
+    }
+
+    // ── 配置 D1 ──────────────────────────────
+    document.getElementById('btnConfigure').addEventListener('click', async () => {
+      const token = document.getElementById('apiTokenInput').value.trim();
+      const errEl = document.getElementById('configureError');
+      errEl.textContent = '';
+      if (!token) { errEl.textContent = '请输入 API Token'; return; }
+      const btn = document.getElementById('btnConfigure');
+      btn.disabled = true; btn.textContent = '连接中...';
+      try {
+        const res = await api.d1.configure(token);
+        toast(res.message || '配置成功！', 'success');
+        document.getElementById('apiTokenInput').value = '';
+        await loadStatus();
+        await loadLogs();
+      } catch (e) {
+        errEl.textContent = e.message;
+      } finally {
+        btn.disabled = false; btn.textContent = '🔗 连接 D1';
+      }
+    });
+
+    document.getElementById('btnSync').addEventListener('click', async () => {
+      try {
+        await api.sync.push();
+        toast('同步成功！', 'success');
+        loadLogs();
+      } catch (e) { toast('同步失败: ' + e.message, 'error'); }
+    });
+
+    document.getElementById('btnRestore').addEventListener('click', async () => {
+      if (!confirm('此操作将用 D1 数据覆盖本地，确定继续？')) return;
+      try {
+        await api.sync.restore();
+        toast('恢复成功，即将返回主页...', 'success');
+        setTimeout(() => location.replace('/'), 1500);
+      } catch (e) { toast('恢复失败: ' + e.message, 'error'); }
+    });
+
+    // ── 一键升级 ─────────────────────────────
     document.getElementById('btnUpgrade').addEventListener('click', async () => {
       const btn = document.getElementById('btnUpgrade');
       const log = document.getElementById('upgradeLog');
-      btn.disabled = true;
-      btn.textContent = '升级中...';
+      btn.disabled = true; btn.textContent = '升级中...';
       log.classList.remove('hidden');
       log.textContent = '正在连接 GitHub，获取最新版本...\n';
       try {
@@ -171,10 +307,13 @@
       } catch (e) {
         log.textContent += '\n错误: ' + e.message;
         toast('升级失败: ' + e.message, 'error');
-        btn.disabled = false;
-        btn.textContent = '检查并升级';
+        btn.disabled = false; btn.textContent = '检查并升级';
       }
     });
+
+    // 初始化
+    loadStatus();
+    loadLogs();
   </script>
 </body>
 </html>
