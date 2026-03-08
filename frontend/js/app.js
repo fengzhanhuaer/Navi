@@ -10,6 +10,24 @@ const state = {
     editingGroupId: null,
 };
 
+// ── 编辑模式 ──────────────────────────────────
+let editMode = false;
+
+function applyEditMode() {
+    document.body.classList.toggle('edit-mode', editMode);
+    if (DOM.iconEdit) DOM.iconEdit.classList.toggle('hidden', editMode);
+    if (DOM.iconDone) DOM.iconDone.classList.toggle('hidden', !editMode);
+    if (DOM.btnEditMode) {
+        DOM.btnEditMode.title = editMode ? '完成编辑' : '开启编辑';
+        DOM.btnEditMode.classList.toggle('active', editMode);
+    }
+    const addGroupRow = document.getElementById('addGroupRow');
+    if (addGroupRow) addGroupRow.classList.toggle('hidden', !editMode);
+    renderBookmarks();
+    if (editMode) toast('编辑模式已开启，可添加/修改/移动内容', 'info', 2000);
+    else toast('已退出编辑模式', 'info', 1500);
+}
+
 // ── DOM 引用 ──────────────────────────────────
 const $ = id => document.getElementById(id);
 
@@ -29,6 +47,9 @@ const DOM = {
     iconMoon: $('iconMoon'),
     btnSettings: $('btnSettings'),
     btnLogout: $('btnLogout'),
+    btnEditMode: $('btnEditMode'),
+    iconEdit: $('iconEdit'),
+    iconDone: $('iconDone'),
     toastContainer: $('toastContainer'),
 
     // Site modal
@@ -82,6 +103,14 @@ DOM.btnLogout.addEventListener('click', () => {
     localStorage.removeItem('navi_token');
     location.replace('/login');
 });
+
+// ── 编辑模式切换 ──────────────────────────────
+if (DOM.btnEditMode) {
+    DOM.btnEditMode.addEventListener('click', () => {
+        editMode = !editMode;
+        applyEditMode();
+    });
+}
 
 // ── 问候语 ────────────────────────────────────
 function updateGreeting() {
@@ -198,7 +227,7 @@ function renderBookmarks() {
     if (!state.groups.length) {
         DOM.bookmarksSection.innerHTML = `
       <p style="text-align:center;color:var(--text-muted);padding:40px;">
-        还没有任何分组，点击下方「新增分组」开始吧！
+        ${editMode ? '还没有任何分组，点击下方「新增分组」开始吧！' : '还没有任何分组，点击右上角✏️开启编辑后添加'}
       </p>`;
         return;
     }
@@ -210,16 +239,25 @@ function renderBookmarks() {
             const faviconEl = faviconUrl.startsWith('http')
                 ? `<img src="${faviconUrl}" alt="${site.title}" onerror="this.parentElement.textContent='🌐'" />`
                 : faviconUrl;
+            const siteEditBtns = editMode ? `
+          <div class="site-actions">
+            <button class="action-btn-xs btn-edit-site" data-id="${site.id}" title="编辑">✏️</button>
+            <button class="action-btn-xs btn-del-site"  data-id="${site.id}" title="删除">🗑</button>
+          </div>` : '';
             return `
         <a class="site-card" href="${site.url}" target="_blank" data-site-id="${site.id}">
           <div class="site-favicon">${faviconEl}</div>
           <span class="site-title">${site.title}</span>
-          <div class="site-actions">
-            <button class="action-btn-xs btn-edit-site" data-id="${site.id}" title="编辑">✏️</button>
-            <button class="action-btn-xs btn-del-site"  data-id="${site.id}" title="删除">🗑</button>
-          </div>
+          ${siteEditBtns}
         </a>`;
         }).join('');
+
+        const groupEditActions = editMode ? `
+          <div class="group-actions">
+            <button class="group-action-btn btn-add-site"  data-gid="${group.id}" title="添加网站">➕</button>
+            <button class="group-action-btn btn-edit-group" data-id="${group.id}"  title="编辑分组">✏️</button>
+            <button class="group-action-btn danger btn-del-group" data-id="${group.id}" title="删除分组">🗑</button>
+          </div>` : '';
 
         return `
       <div class="group-card ${group.collapsed ? 'collapsed' : ''}" data-group-id="${group.id}">
@@ -227,11 +265,7 @@ function renderBookmarks() {
           <span class="group-icon">${group.icon || '📁'}</span>
           <span class="group-name">${group.name}</span>
           <span class="group-count">${groupSites.length}</span>
-          <div class="group-actions">
-            <button class="group-action-btn btn-add-site"  data-gid="${group.id}" title="添加网站">➕</button>
-            <button class="group-action-btn btn-edit-group" data-id="${group.id}"  title="编辑分组">✏️</button>
-            <button class="group-action-btn danger btn-del-group" data-id="${group.id}" title="删除分组">🗑</button>
-          </div>
+          ${groupEditActions}
           <span class="group-collapse-icon">▾</span>
         </div>
         <div class="sites-grid">
@@ -248,11 +282,12 @@ function renderBookmarks() {
 function initSortable() {
     if (typeof Sortable === 'undefined') return;
 
-    // 1. 分组拖拽
+    // 1. 分组拖拽（仅编辑模式）
     Sortable.create(DOM.bookmarksSection, {
         animation: 150,
         handle: '.group-header',
         ghostClass: 'sortable-ghost',
+        disabled: !editMode,
         onEnd: async function () {
             const groupCards = DOM.bookmarksSection.querySelectorAll('.group-card');
             const items = Array.from(groupCards).map((el, index) => ({
@@ -275,12 +310,13 @@ function initSortable() {
         }
     });
 
-    // 2. 书签网站拖拽 (跨组)
+    // 2. 书签网站拖拽（跨组，仅编辑模式）
     document.querySelectorAll('.sites-grid').forEach(grid => {
         Sortable.create(grid, {
             group: 'shared-sites',
             animation: 150,
             ghostClass: 'sortable-ghost',
+            disabled: !editMode,
             onEnd: async function (evt) {
                 const siteId = parseInt(evt.item.dataset.siteId);
                 const newGroupId = parseInt(evt.to.closest('.group-card').dataset.groupId);

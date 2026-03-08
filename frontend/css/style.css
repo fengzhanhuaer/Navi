@@ -170,6 +170,34 @@ body.light .top-bar {
   transform: scale(0.95);
 }
 
+/* 编辑模式按钮激活态 */
+.icon-btn.edit-mode-btn.active {
+  background: rgba(34, 197, 94, .15);
+  border-color: rgba(34, 197, 94, .5);
+  color: #22c55e;
+  box-shadow: 0 0 12px rgba(34, 197, 94, .2);
+}
+
+.icon-btn.edit-mode-btn.active:hover {
+  background: rgba(34, 197, 94, .22);
+  border-color: #22c55e;
+  transform: translateY(-1px);
+}
+
+/* 编辑模式下分组头部显示移动光标 */
+body.edit-mode .group-header {
+  cursor: grab;
+}
+
+body.edit-mode .group-header:active {
+  cursor: grabbing;
+}
+
+/* 编辑模式下分组操作始终可见 */
+body.edit-mode .group-actions {
+  opacity: 1;
+}
+
 /* ── 主内容区 ── */
 .main-content {
   position: relative;
