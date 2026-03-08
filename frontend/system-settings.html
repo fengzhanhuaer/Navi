@@ -146,24 +146,6 @@
       }, dur);
     }
 
-    // ── 主题切换 ──────────────────────────────
-    const savedTheme = localStorage.getItem('navi_theme') || 'dark';
-    document.body.classList.toggle('dark', savedTheme === 'dark');
-    document.body.classList.toggle('light', savedTheme === 'light');
-    document.getElementById('iconSun').classList.toggle('hidden', savedTheme === 'dark');
-    document.getElementById('iconMoon').classList.toggle('hidden', savedTheme === 'light');
-
-    document.getElementById('btnTheme').addEventListener('click', async () => {
-      const isDark = document.body.classList.contains('dark');
-      const next = isDark ? 'light' : 'dark';
-      document.body.classList.toggle('dark', next === 'dark');
-      document.body.classList.toggle('light', next === 'light');
-      document.getElementById('iconSun').classList.toggle('hidden', next === 'dark');
-      document.getElementById('iconMoon').classList.toggle('hidden', next === 'light');
-      localStorage.setItem('navi_theme', next);
-      try { await api.settings.set('theme', next); } catch {}
-    });
-
     // ── 搜索引擎 ────────────────────────────
     const engineSel = document.getElementById('settingSearchEngine');
     engineSel.value = localStorage.getItem('navi_search_engine') || 'google';
