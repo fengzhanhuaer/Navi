@@ -34,6 +34,37 @@ function getFaviconUrl(siteUrl) {
     return `/api/favicon?url=${encodeURIComponent(siteUrl)}`;
 }
 
+/**
+ * 前端抓取 favicon 并上传到服务器缓存
+ * 使用 Google favicon API（有 CORS 支持）获取图标字节，再 POST 到 /api/favicon/upload
+ * 返回：true 表示成功，false 表示失败（静默）
+ */
+async function fetchAndUploadFavicon(siteUrl) {
+    try {
+        let domain;
+        try { domain = new URL(siteUrl).hostname; }
+        catch { domain = new URL('https://' + siteUrl).hostname; }
+
+        // 使用 Google favicon 服务（CORS 友好，可信赖）
+        const googleUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+        const res = await fetch(googleUrl);
+        if (!res.ok) return false;
+
+        const blob = await res.blob();
+        if (blob.size < 50) return false; // 过小说明没有图标
+
+        // 上传到服务器缓存
+        const uploadRes = await fetch(`/api/favicon/upload?url=${encodeURIComponent(siteUrl)}`, {
+            method: 'POST',
+            body: blob,
+            headers: { 'Content-Type': blob.type || 'image/png' },
+        });
+        return uploadRes.ok;
+    } catch {
+        return false;
+    }
+}
+
 // ── 渲染分组列表 ──────────────────────────────
 function render() {
     const container = $('editGroupList');
@@ -102,30 +133,24 @@ function bindEvents() {
         btn.addEventListener('click', () => openSiteModal(null, parseInt(btn.dataset.gid)));
     });
 
-    // 刷新图标
+    // 刷新图标（前端抓取并上传）
     document.querySelectorAll('.btn-refresh-icon').forEach(btn => {
         btn.addEventListener('click', async () => {
             const siteUrl = btn.dataset.url;
+            const siteId = btn.dataset.id;
             btn.textContent = '⏳';
             btn.disabled = true;
-            try {
-                const res = await fetch(`/api/favicon/refresh?url=${encodeURIComponent(siteUrl)}`, { method: 'POST' });
-                const data = await res.json();
-                if (data.ok) {
-                    // 刷新对应的 img（加时间戳避免缓存）
-                    const siteId = btn.dataset.id;
-                    const img = document.querySelector(`.edit-site-favicon img[data-site-id="${siteId}"]`);
-                    if (img) img.src = `/api/favicon?url=${encodeURIComponent(siteUrl)}&t=${Date.now()}`;
-                    toast('图标已更新', 'success');
-                } else {
-                    toast('图标抓取失败: ' + (data.error || ''), 'error');
-                }
-            } catch (e) {
-                toast('请求失败: ' + e.message, 'error');
-            } finally {
-                btn.textContent = '🔄';
-                btn.disabled = false;
+            const ok = await fetchAndUploadFavicon(siteUrl);
+            if (ok) {
+                // 刷新对应的 img（加时间戳避免浏览器缓存）
+                const img = document.querySelector(`.edit-site-favicon img[data-site-id="${siteId}"]`);
+                if (img) img.src = `/api/favicon?url=${encodeURIComponent(siteUrl)}&t=${Date.now()}`;
+                toast('图标已更新', 'success');
+            } else {
+                toast('图标获取失败（可能是 CORS 限制或网站无图标）', 'info', 4000);
             }
+            btn.textContent = '🔄';
+            btn.disabled = false;
         });
     });
 
@@ -350,6 +375,19 @@ $('siteModalSave').addEventListener('click', async () => {
         }
         closeSiteModal();
         render();
+        // 如果用户未手填图标，异步在后台抽取并上传（不阻塞 UI）
+        if (!icon) {
+            fetchAndUploadFavicon(url).then(ok => {
+                if (ok) {
+                    // 刷新当前页面中对应的图标
+                    document.querySelectorAll(`.edit-site-favicon img`).forEach(img => {
+                        if (img.src.includes(encodeURIComponent(url))) {
+                            img.src = `/api/favicon?url=${encodeURIComponent(url)}&t=${Date.now()}`;
+                        }
+                    });
+                }
+            });
+        }
     } catch (e) { toast('保存失败: ' + e.message, 'error'); }
 });
 
