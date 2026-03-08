@@ -53,6 +53,9 @@ func main() {
 		log.Fatalf("DB init failed: %v", err)
 	}
 
+	// 初始化图标本地缓存目录（与主 DB 分离，不同步到 D1）
+	handlers.InitIconCache(dataDir)
+
 	// 初始化 D1 客户端
 	d1 := db.NewD1Client()
 	if d1.IsConfigured() {
@@ -141,6 +144,10 @@ func main() {
 		authGroup.POST("/register", handlers.Register)
 		authGroup.POST("/login", handlers.Login)
 	}
+
+	// ── 图标代理（无需登录，img 标签直接访问）────
+	r.GET("/api/favicon", handlers.GetFavicon)
+	r.POST("/api/favicon/refresh", handlers.RefreshFavicon)
 
 	// ── 受保护的 API（需要登录）────────────────
 	api := r.Group("/api", handlers.AuthMiddleware())

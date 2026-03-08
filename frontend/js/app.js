@@ -97,9 +97,7 @@ DOM.btnTheme.addEventListener('click', async () => {
 
 // ── Favicon ───────────────────────────────────
 function getFaviconUrl(siteUrl) {
-    try {
-        return `https://www.google.com/s2/favicons?domain=${new URL(siteUrl).origin}&sz=64`;
-    } catch { return ''; }
+    return `/api/favicon?url=${encodeURIComponent(siteUrl)}`;
 }
 
 // ── 搜索引擎切换 ────────────────────────────────

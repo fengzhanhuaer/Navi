@@ -31,9 +31,7 @@ function toast(msg, type = 'info', duration = 3000) {
 }
 
 function getFaviconUrl(siteUrl) {
-    try {
-        return `https://www.google.com/s2/favicons?domain=${new URL(siteUrl).origin}&sz=64`;
-    } catch { return ''; }
+    return `/api/favicon?url=${encodeURIComponent(siteUrl)}`;
 }
 
 // ── 渲染分组列表 ──────────────────────────────
@@ -51,10 +49,12 @@ function render() {
 
         const sitesHtml = groupSites.length
             ? groupSites.map(site => {
-                const faviconUrl = site.icon || getFaviconUrl(site.url);
-                const faviconEl = faviconUrl.startsWith('http')
-                    ? `<img src="${faviconUrl}" alt="${site.title}" onerror="this.parentElement.textContent='🌐'" />`
-                    : (faviconUrl || '🌐');
+                // 用户手填的 emoji 直接展示；否则走本地 /api/favicon 缓存
+                const isEmoji = site.icon && !site.icon.startsWith('http') && !site.icon.startsWith('/');
+                const faviconSrc = isEmoji ? null : getFaviconUrl(site.url);
+                const faviconEl = isEmoji
+                    ? site.icon
+                    : `<img src="${faviconSrc}" alt="${site.title}" data-site-id="${site.id}" onerror="this.parentElement.textContent='🌐'" />`;
                 return `
           <div class="edit-site-row" data-site-id="${site.id}">
             <span class="edit-drag-handle">⠿</span>
@@ -62,6 +62,7 @@ function render() {
             <span class="edit-site-name">${site.title}</span>
             <span class="edit-site-url">${site.url}</span>
             <div class="edit-site-actions">
+              <button class="edit-btn btn-refresh-icon" data-id="${site.id}" data-url="${site.url}" title="重新抓取图标">🔄</button>
               <button class="edit-btn btn-edit-site" data-id="${site.id}">✏️ 编辑</button>
               <button class="edit-btn danger btn-del-site" data-id="${site.id}">🗑 删除</button>
             </div>
@@ -99,6 +100,33 @@ function bindEvents() {
     // 添加网站
     document.querySelectorAll('.btn-add-site').forEach(btn => {
         btn.addEventListener('click', () => openSiteModal(null, parseInt(btn.dataset.gid)));
+    });
+
+    // 刷新图标
+    document.querySelectorAll('.btn-refresh-icon').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const siteUrl = btn.dataset.url;
+            btn.textContent = '⏳';
+            btn.disabled = true;
+            try {
+                const res = await fetch(`/api/favicon/refresh?url=${encodeURIComponent(siteUrl)}`, { method: 'POST' });
+                const data = await res.json();
+                if (data.ok) {
+                    // 刷新对应的 img（加时间戳避免缓存）
+                    const siteId = btn.dataset.id;
+                    const img = document.querySelector(`.edit-site-favicon img[data-site-id="${siteId}"]`);
+                    if (img) img.src = `/api/favicon?url=${encodeURIComponent(siteUrl)}&t=${Date.now()}`;
+                    toast('图标已更新', 'success');
+                } else {
+                    toast('图标抓取失败: ' + (data.error || ''), 'error');
+                }
+            } catch (e) {
+                toast('请求失败: ' + e.message, 'error');
+            } finally {
+                btn.textContent = '🔄';
+                btn.disabled = false;
+            }
+        });
     });
 
     // 编辑网站
