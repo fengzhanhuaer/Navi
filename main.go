@@ -114,6 +114,7 @@ func main() {
 		r.Static("/css", frontendDir+"/css")
 		r.Static("/js", frontendDir+"/js")
 		r.StaticFile("/", frontendDir+"/index.html")
+		r.StaticFile("/favicon.png", frontendDir+"/favicon.png")
 		log.Printf("[FRONTEND] Disk: %s", frontendDir)
 	} else {
 		sub, err := fs.Sub(embeddedFrontend, "frontend")
@@ -125,6 +126,10 @@ func main() {
 		r.GET("/", func(c *gin.Context) {
 			data, _ := embeddedFrontend.ReadFile("frontend/index.html")
 			c.Data(200, "text/html; charset=utf-8", data)
+		})
+		r.GET("/favicon.png", func(c *gin.Context) {
+			data, _ := embeddedFrontend.ReadFile("frontend/favicon.png")
+			c.Data(200, "image/png", data)
 		})
 		log.Println("[FRONTEND] Embedded binary")
 	}
