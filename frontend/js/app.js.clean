@@ -1,8 +1,7 @@
-/**
- * app.js — 个人导航页主逻辑（含认证流程）
- */
+﻿/**
+ * app.js �?个人导航页主逻辑（含认证流程�? */
 
-// ── 应用状态 ──────────────────────────────────
+// ── 应用状�?──────────────────────────────────
 const state = {
     groups: [],
     sites: [],
@@ -14,8 +13,7 @@ const state = {
 const $ = id => document.getElementById(id);
 
 const DOM = {
-    // 主应用
-    appRoot: $('appRoot'),
+    // 主应�?    appRoot: $('appRoot'),
     greeting: $('greeting'),
     searchEngineSelector: $('searchEngineSelector'),
     currentEngineBtn: $('currentEngineBtn'),
@@ -50,7 +48,7 @@ const DOM = {
     groupIcon: $('groupIcon'),
     emojiPicker: $('emojiPicker'),
 
-    // Settings modal (hidden placeholder elements)
+    // Settings modal
     settingsModalBackdrop: $('settingsModalBackdrop'),
     settingBackground: $('settingBackground'),
     settingSearchEngine: $('settingSearchEngine'),
@@ -76,7 +74,7 @@ function showApp() {
     DOM.appRoot.classList.remove('hidden');
 }
 
-// ── 退出登录 ──────────────────────────────────
+// ── 退出登�?──────────────────────────────────
 DOM.btnLogout.addEventListener('click', () => {
     if (!confirm('确定退出登录？')) return;
     localStorage.removeItem('navi_token');
@@ -87,10 +85,10 @@ DOM.btnLogout.addEventListener('click', () => {
 function updateGreeting() {
     const h = new Date().getHours();
     const greetings = [
-        [5, '凌晨好，夜猫子 🌙'],
-        [9, '早上好！☀️'],
-        [12, '上午好！🌤️'],
-        [14, '午好！🍱'],
+        [5, '凌晨好，夜猫�?🌙'],
+        [9, '早上好！☀�?],
+        [12, '上午好！🌤�?],
+        [14, '午好！�?],
         [18, '下午好！🍵'],
         [22, '晚上好！🌆'],
         [24, '深夜了，注意休息 🌙'],
@@ -103,17 +101,15 @@ function updateGreeting() {
 function applyTheme(theme) {
     document.body.classList.toggle('dark', theme === 'dark');
     document.body.classList.toggle('light', theme === 'light');
-    if (DOM.iconSun && DOM.iconMoon) {
-        DOM.iconSun.classList.toggle('hidden', theme === 'dark');
-        DOM.iconMoon.classList.toggle('hidden', theme !== 'dark');
-    }
+    DOM.iconSun.classList.toggle('hidden', theme === 'dark');
+    DOM.iconMoon.classList.toggle('hidden', theme === 'light');
 }
 
 DOM.btnTheme.addEventListener('click', async () => {
-    const newTheme = document.body.classList.contains('dark') ? 'light' : 'dark';
-    applyTheme(newTheme);
-    state.settings.theme = newTheme;
-    try { await api.settings.set('theme', newTheme); } catch { }
+    const next = (state.settings.theme || 'dark') === 'dark' ? 'light' : 'dark';
+    state.settings.theme = next;
+    applyTheme(next);
+    try { await api.settings.set('theme', next); } catch { }
 });
 
 // ── Favicon ───────────────────────────────────
@@ -136,39 +132,32 @@ if (!ENGINES[currentEngine]) currentEngine = 'google';
 function setEngine(engineKey) {
     currentEngine = engineKey;
     localStorage.setItem('navi_search_engine', engineKey);
-    if (DOM.currentEngineIcon) {
-        DOM.currentEngineIcon.src = ENGINES[engineKey].icon;
-        DOM.currentEngineIcon.alt = ENGINES[engineKey].name;
-    }
-    if (DOM.engineDropdown) DOM.engineDropdown.classList.add('hidden');
+    DOM.currentEngineIcon.src = ENGINES[engineKey].icon;
+    DOM.currentEngineIcon.alt = ENGINES[engineKey].name;
+    DOM.engineDropdown.classList.add('hidden');
     DOM.searchInput.focus();
 }
 
-// 初始化搜索引擎图标
-setEngine(currentEngine);
+// 初始化搜索引擎图�?setEngine(currentEngine);
 
 // 切换下拉菜单
-if (DOM.currentEngineBtn) {
-    DOM.currentEngineBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        DOM.engineDropdown.classList.toggle('hidden');
-    });
-}
+DOM.currentEngineBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    DOM.engineDropdown.classList.toggle('hidden');
+});
 
 // 选择引擎
-if (DOM.engineDropdown) {
-    DOM.engineDropdown.querySelectorAll('.engine-option').forEach(opt => {
-        opt.addEventListener('click', (e) => {
-            e.stopPropagation();
-            setEngine(opt.dataset.engine);
-        });
+DOM.engineDropdown.querySelectorAll('.engine-option').forEach(opt => {
+    opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setEngine(opt.dataset.engine);
     });
-}
+});
 
 // 点击外部关闭下拉菜单
 document.addEventListener('click', e => {
-    if (DOM.searchEngineSelector && !DOM.searchEngineSelector.contains(e.target)) {
-        if (DOM.engineDropdown) DOM.engineDropdown.classList.add('hidden');
+    if (!DOM.searchEngineSelector.contains(e.target)) {
+        DOM.engineDropdown.classList.add('hidden');
     }
 });
 
@@ -198,8 +187,7 @@ function renderBookmarks() {
     if (!state.groups.length) {
         DOM.bookmarksSection.innerHTML = `
       <p style="text-align:center;color:var(--text-muted);padding:40px;">
-        还没有任何分组，点击下方「新增分组」开始吧！
-      </p>`;
+        还没有任何分组，点击下方「新增分组」开始吧�?      </p>`;
         return;
     }
 
@@ -215,8 +203,8 @@ function renderBookmarks() {
           <div class="site-favicon">${faviconEl}</div>
           <span class="site-title">${site.title}</span>
           <div class="site-actions">
-            <button class="action-btn-xs btn-edit-site" data-id="${site.id}" title="编辑">✏️</button>
-            <button class="action-btn-xs btn-del-site"  data-id="${site.id}" title="删除">🗑</button>
+            <button class="action-btn-xs btn-edit-site" data-id="${site.id}" title="编辑">�?/button>
+            <button class="action-btn-xs btn-del-site"  data-id="${site.id}" title="删除">�?/button>
           </div>
         </a>`;
         }).join('');
@@ -228,11 +216,11 @@ function renderBookmarks() {
           <span class="group-name">${group.name}</span>
           <span class="group-count">${groupSites.length}</span>
           <div class="group-actions">
-            <button class="group-action-btn btn-add-site"  data-gid="${group.id}" title="添加网站">➕</button>
-            <button class="group-action-btn btn-edit-group" data-id="${group.id}"  title="编辑分组">✏️</button>
+            <button class="group-action-btn btn-add-site"  data-gid="${group.id}" title="添加网站">�?/button>
+            <button class="group-action-btn btn-edit-group" data-id="${group.id}"  title="编辑分组">�?/button>
             <button class="group-action-btn danger btn-del-group" data-id="${group.id}" title="删除分组">🗑</button>
           </div>
-          <span class="group-collapse-icon">▾</span>
+          <span class="group-collapse-icon">�?/span>
         </div>
         <div class="sites-grid">
           ${sitesHtml}
@@ -251,8 +239,7 @@ function initSortable() {
     // 1. 分组拖拽
     Sortable.create(DOM.bookmarksSection, {
         animation: 150,
-        handle: '.group-header',
-        ghostClass: 'sortable-ghost',
+        handle: '.group-header', // 仅可通过标题栏拖�?        ghostClass: 'sortable-ghost',
         onEnd: async function () {
             const groupCards = DOM.bookmarksSection.querySelectorAll('.group-card');
             const items = Array.from(groupCards).map((el, index) => ({
@@ -260,6 +247,7 @@ function initSortable() {
                 order: index
             }));
             
+            // 乐观更新
             items.forEach(item => {
                 const g = state.groups.find(x => x.id === item.id);
                 if (g) g.order_index = item.order;
@@ -270,7 +258,7 @@ function initSortable() {
                 await api.groups.reorder(items);
             } catch (e) {
                 toast('分组排序保存失败: ' + e.message, 'error');
-                loadApp();
+                loadData();
             }
         }
     });
@@ -278,10 +266,11 @@ function initSortable() {
     // 2. 书签网站拖拽 (跨组)
     document.querySelectorAll('.sites-grid').forEach(grid => {
         Sortable.create(grid, {
-            group: 'shared-sites',
+            group: 'shared-sites', // 允许�?grid 拖拽
             animation: 150,
             ghostClass: 'sortable-ghost',
             onEnd: async function (evt) {
+                // 如果跨组拖拽了，则要更新该书签的 group_id
                 const siteId = parseInt(evt.item.dataset.siteId);
                 const newGroupId = parseInt(evt.to.closest('.group-card').dataset.groupId);
                 const oldGroupId = parseInt(evt.from.closest('.group-card').dataset.groupId);
@@ -291,6 +280,7 @@ function initSortable() {
 
                 if (newGroupId !== oldGroupId) {
                     s.group_id = newGroupId;
+                    // 同步到后端更�?group_id
                     try {
                         await api.sites.update(siteId, {
                             group_id: newGroupId,
@@ -300,22 +290,29 @@ function initSortable() {
                         });
                     } catch (e) {
                         toast('跨组移动失败: ' + e.message, 'error');
-                        loadApp();
+                        loadData();
                         return;
                     }
                 }
 
-                const siteCards = evt.to.querySelectorAll('.site-card');
+                // 无论是同组排序还是跨组，都需要更新目标组内的所有元素顺�?                const siteCards = evt.to.querySelectorAll('.site-card');
                 const items = Array.from(siteCards).map((el, index) => ({
                     id: parseInt(el.dataset.siteId),
-                    order: index,
-                    group_id: newGroupId,
+                    order: index
                 }));
 
+                // 乐观更新
+                items.forEach(item => {
+                    const s = state.sites.find(x => x.id === item.id);
+                    if (s) s.order_index = item.order;
+                });
+                state.sites.sort((a, b) => a.order_index - b.order_index);
+                
                 try {
                     await api.sites.reorder(items);
                 } catch (e) {
-                    toast('网站排序保存失败: ' + e.message, 'error');
+                    toast('书签排序保存失败: ' + e.message, 'error');
+                    loadData();
                 }
             }
         });
@@ -352,7 +349,7 @@ function bindBookmarkEvents() {
                 await api.sites.delete(parseInt(el.dataset.id));
                 state.sites = state.sites.filter(s => s.id !== parseInt(el.dataset.id));
                 renderBookmarks();
-                toast('已删除', 'info');
+                toast('已删�?, 'info');
             } catch (err) { toast('删除失败: ' + err.message, 'error'); }
         });
     });
@@ -371,7 +368,7 @@ function bindBookmarkEvents() {
                 state.groups = state.groups.filter(g => g.id !== gid);
                 state.sites = state.sites.filter(s => s.group_id !== gid);
                 renderBookmarks();
-                toast('分组已删除', 'info');
+                toast('分组已删�?, 'info');
             } catch (err) { toast('删除失败: ' + err.message, 'error'); }
         });
     });
@@ -379,8 +376,8 @@ function bindBookmarkEvents() {
 
 // ── 分组模态框 ────────────────────────────────
 const PRESET_EMOJIS = [
-    '📁', '⭐️', '📚', '💼', '🎮', '🛠️', '🎵', '📺', '🛍️', '💡', '💰', '🚀', '🧠', '☁️', '🔥',
-    '💻', '📱', '🎨', '📝', '🔗', '📰', '🕹️', '✉️', '📅', '🗑️', '🔍', '⚙️', '🔒', '🔑', '🌍'
+    '📁', '⭐️', '📚', '💼', '🎮', '🛠�?, '🎵', '📺', '🛍�?, '💡', '💰', '🚀', '🧠', '☁️', '🔥',
+    '💻', '📱', '🎨', '📝', '🔗', '📰', '🕹�?, '✉️', '📅', '🗑�?, '🔍', '⚙️', '🔒', '🔑', '🌍'
 ];
 
 function initEmojiPicker() {
@@ -427,11 +424,11 @@ DOM.groupForm.addEventListener('submit', async e => {
             const g = state.groups.find(g => g.id === state.editingGroupId);
             await api.groups.update(state.editingGroupId, { name, icon, collapsed: g.collapsed });
             g.name = name; g.icon = icon;
-            toast('分组已更新', 'success');
+            toast('分组已更�?, 'success');
         } else {
             const { id } = await api.groups.create(name, icon);
             state.groups.push({ id, name, icon, order_index: state.groups.length, collapsed: false });
-            toast('分组已创建', 'success');
+            toast('分组已创�?, 'success');
         }
         closeGroupModal(); renderBookmarks();
     } catch (err) { toast('保存失败: ' + err.message, 'error'); }
@@ -481,11 +478,11 @@ DOM.siteForm.addEventListener('submit', async e => {
         if (siteId) {
             await api.sites.update(siteId, data);
             Object.assign(state.sites.find(s => s.id === siteId), data);
-            toast('已更新', 'success');
+            toast('已更�?, 'success');
         } else {
             const { id } = await api.sites.create(data);
             state.sites.push({ ...data, id, order_index: 0 });
-            toast('网站已添加', 'success');
+            toast('网站已添�?, 'success');
         }
         closeSiteModal(); renderBookmarks();
     } catch (err) { toast('保存失败: ' + err.message, 'error'); }
@@ -495,10 +492,53 @@ $('siteModalClose').addEventListener('click', closeSiteModal);
 $('siteModalCancel').addEventListener('click', closeSiteModal);
 DOM.siteModalBackdrop.addEventListener('click', e => { if (e.target === DOM.siteModalBackdrop) closeSiteModal(); });
 
+// ── 外观设置面板 ──────────────────────────────
+DOM.btnSettings.addEventListener('click', () => {
+    DOM.settingsModalBackdrop.classList.remove('hidden');
+    DOM.settingBackground.value = state.settings.background || 'gradient';
+    DOM.settingSearchEngine.value = localStorage.getItem('navi_search_engine') || 'google';
+    DOM.upgradeLog.classList.add('hidden');
+    DOM.upgradeLog.innerHTML = '';
+});
+
+DOM.settingBackground.addEventListener('change', async e => {
+    state.settings.background = e.target.value;
+    applyBackground(e.target.value);
+    try { await api.settings.set('background', e.target.value); } catch { }
+});
+
+DOM.settingSearchEngine.addEventListener('change', e => {
+    setEngine(e.target.value);
+});
+
+DOM.btnUpgrade.addEventListener('click', async () => {
+    DOM.btnUpgrade.disabled = true;
+    DOM.btnUpgrade.textContent = '升级�?..';
+    DOM.upgradeLog.classList.remove('hidden');
+    DOM.upgradeLog.innerHTML = '<div class="log-item">正在向服务器发送升级指�?..</div>';
+    
+    try {
+        const res = await api.settings.upgrade();
+        DOM.upgradeLog.innerHTML += `<div class="log-item"><pre>${res.log || '升级已完成，无日志返�?}</pre></div>`;
+        toast('升级命令执行完毕，请根据日志查看是否成功。如果是重新编译更新，服务端可能将在一会后暂时断开�?, 'success', 5000);
+    } catch (err) {
+        DOM.upgradeLog.innerHTML += `<div class="log-item ls-error">升级失败: ${err.message}</div>`;
+        toast('升级失败', 'error');
+    } finally {
+        DOM.btnUpgrade.disabled = false;
+        DOM.btnUpgrade.textContent = '检查并升级';
+    }
+});
+
+$('settingsModalClose').addEventListener('click', () => DOM.settingsModalBackdrop.classList.add('hidden'));
+DOM.settingsModalBackdrop.addEventListener('click', e => {
+    if (e.target === DOM.settingsModalBackdrop) DOM.settingsModalBackdrop.classList.add('hidden');
+});
+
 // ── 背景 ──────────────────────────────────────
 function applyBackground(bg) { document.body.dataset.bg = bg; }
 
-// ── 加载主应用数据 ────────────────────────────
+// ── 加载主应用数�?────────────────────────────
 async function loadApp() {
     showApp();
     updateGreeting();
@@ -518,34 +558,38 @@ async function loadApp() {
     }
 }
 
-// ── 初始化入口 ────────────────────────────────
+// ── 初始化入�?────────────────────────────────
 async function init() {
-    const token = localStorage.getItem('navi_token');
+    // 先检查注册状�?    const token = localStorage.getItem('navi_token');
 
     try {
         const { registered } = await api.auth.status();
 
         if (token) {
-            try {
-                showApp();
+            // �?token �?尝试加载应用主业�?            try {
+                // 加载成功后展示应�?                showApp();
                 await loadApp();
             } catch (appErr) {
-                if (appErr.message !== '请重新登录') {
+                if (appErr.message !== '请重新登�?) {
                     console.error('App init failed:', appErr);
-                    toast('加载失败：' + appErr.message, 'error');
+                    toast('加载失败�? + appErr.message, 'error');
                 } else {
+                    // 对于主动抛出�?401，跳转到登录
                     location.replace('/login');
                 }
             }
         } else if (!registered) {
-            location.replace('/register');
+            // 还没有用�?�?跳转注册�?            location.replace('/register');
         } else {
-            location.replace('/login');
+            // 已有用户但没 token �?跳转登录�?            location.replace('/login');
         }
     } catch (err) {
-        toast('无法连接到服务器，请检查后端运行状态。', 'error', 8000);
+        // 连不上服务器
+        toast('无法连接到服务器，请检查后端运行状态�?, 'error', 8000);
         console.error(err);
     }
 }
 
 init();
+
+
