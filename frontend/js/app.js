@@ -68,11 +68,11 @@ function updateGreeting() {
     const greetings = [
         [5, '凌晨好，夜猫子 🌙'],
         [9, '早上好！☀️'],
-        [12, '上午好！🌤️'],
+        [12, '上午好！🌤'],
         [14, '午好！🍱'],
         [18, '下午好！🍵'],
-        [22, '晚上好！🌆'],
-        [24, '深夜了，注意休息 🌙'],
+        [22, '晚上好！🌙'],
+        [24, '深夜了，注意休息 🌛'],
     ];
     const g = greetings.find(([limit]) => h < limit) || greetings[greetings.length - 1];
     DOM.greeting.textContent = g[1];

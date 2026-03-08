@@ -218,6 +218,8 @@ body.edit-mode .group-actions {
   font-weight: 700;
   letter-spacing: -1px;
   margin-bottom: 28px;
+  display: inline-block;
+  color: var(--accent-1);
   background: var(--accent-grad);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
