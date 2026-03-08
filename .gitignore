@@ -25,4 +25,4 @@ backend/frontend/
 Thumbs.db
 *.exe
 *.log
-*.exe~
+navi.exe~

@@ -35,35 +35,25 @@ function getFaviconUrl(siteUrl) {
 }
 
 /**
- * 前端抓取 favicon 并上传到服务器缓存
- * 使用 Google favicon API（有 CORS 支持）获取图标字节，再 POST 到 /api/favicon/upload
- * 返回：true 表示成功，false 表示失败（静默）
+ * 触发服务器按需抓取 favicon 并缓存
+ * 调用 POST /api/favicon/fetch，服务端多源降级（DuckDuckGo→直接站点→Google）
+ * 返回：true 表示成功缓存，false 表示失败（静默）
  */
-async function fetchAndUploadFavicon(siteUrl) {
+async function triggerServerFetchFavicon(siteUrl) {
     try {
-        let domain;
-        try { domain = new URL(siteUrl).hostname; }
-        catch { domain = new URL('https://' + siteUrl).hostname; }
-
-        // 使用 Google favicon 服务（CORS 友好，可信赖）
-        const googleUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-        const res = await fetch(googleUrl);
+        const res = await fetch(
+            `/api/favicon/fetch?url=${encodeURIComponent(siteUrl)}`,
+            { method: 'POST' }
+        );
         if (!res.ok) return false;
-
-        const blob = await res.blob();
-        if (blob.size < 50) return false; // 过小说明没有图标
-
-        // 上传到服务器缓存
-        const uploadRes = await fetch(`/api/favicon/upload?url=${encodeURIComponent(siteUrl)}`, {
-            method: 'POST',
-            body: blob,
-            headers: { 'Content-Type': blob.type || 'image/png' },
-        });
-        return uploadRes.ok;
-    } catch {
-        return false;
-    }
+        const data = await res.json();
+        return data.ok === true;
+    } catch { return false; }
 }
+
+// 兼容旧调用名
+const fetchAndUploadFavicon = triggerServerFetchFavicon;
+
 
 // ── 渲染分组列表 ──────────────────────────────
 function render() {

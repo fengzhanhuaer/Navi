@@ -146,9 +146,10 @@ func main() {
 	}
 
 	// ── 图标代理（无需登录，img 标签直接访问）────
-	r.GET("/api/favicon", handlers.GetFavicon)             // 从缓存提供
-	r.POST("/api/favicon/upload", handlers.UploadFavicon)  // 前端上传存储
-	r.DELETE("/api/favicon", handlers.DeleteFavicon)       // 删除缓存
+	r.GET("/api/favicon", handlers.GetFavicon)              // 从缓存提供
+	r.POST("/api/favicon/fetch", handlers.FetchAndCacheFavicon) // 服务端按需抓取（前端触发）
+	r.POST("/api/favicon/upload", handlers.UploadFavicon)   // 前端上传存储（备用）
+	r.DELETE("/api/favicon", handlers.DeleteFavicon)         // 删除缓存
 
 	// ── 受保护的 API（需要登录）────────────────
 	api := r.Group("/api", handlers.AuthMiddleware())
