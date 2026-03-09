@@ -195,6 +195,7 @@ func main() {
 		r.StaticFile("/login", frontendDir2+"/login.html")
 		r.StaticFile("/register", frontendDir2+"/register.html")
 		r.StaticFile("/edit", frontendDir2+"/edit.html")
+		r.StaticFile("/system-settings", frontendDir2+"/system-settings.html")
 	} else {
 		r.GET("/settings", func(c *gin.Context) {
 			data, _ := embeddedFrontend.ReadFile("frontend/settings.html")
