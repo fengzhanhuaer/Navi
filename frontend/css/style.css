@@ -305,83 +305,147 @@ body.edit-mode .group-actions {
   transform: scale(0.95);
 }
 
-/* ── 书签区域 ── */
+/* ── 书签区域 (Tab Layout) ── */
 .bookmarks-section {
   display: flex;
   flex-direction: column;
-  gap: 24px;
   animation: fadeUp .6s .2s ease both;
 }
 
-/* 分组卡片 */
-.group-card {
+.tabs-container {
+  display: flex;
+  flex-direction: row;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   backdrop-filter: var(--glass);
   overflow: hidden;
-  transition: border-color var(--transition), box-shadow var(--transition);
+  box-shadow: var(--shadow-sm);
+  min-height: 360px; /* Base height to give left sidebar some presence */
 }
 
-.group-card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-md);
+.tabs-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: 1px solid var(--border);
+  border-bottom: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-active) transparent;
+  min-width: 160px;
+  max-width: 240px;
+  background: rgba(0, 0, 0, 0.05); /* Slight tint for sidebar */
 }
 
-.group-header {
+body.light .tabs-nav {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.tabs-nav::-webkit-scrollbar {
+  width: 4px;
+}
+.tabs-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tabs-nav::-webkit-scrollbar-thumb {
+  background-color: var(--surface-active);
+  border-radius: 10px;
+}
+
+.tab-btn {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 20px;
-  cursor: pointer;
-  user-select: none;
-  border-bottom: 1px solid var(--border);
-  transition: background var(--transition);
-}
-
-.group-header:hover {
-  background: var(--surface-hover);
-}
-
-.group-icon {
-  font-size: 1.2rem;
-}
-
-.group-name {
-  flex: 1;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font);
   font-size: .95rem;
-  font-weight: 600;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition);
+  user-select: none;
+  justify-content: flex-start;
+  text-align: left;
+  border-left: 3px solid transparent; /* Indicator slot */
+}
+
+.tab-btn:hover {
+  background: var(--surface-hover);
   color: var(--text-primary);
 }
 
-.group-count {
-  font-size: .78rem;
-  color: var(--text-muted);
+.tab-btn.active {
   background: var(--surface-active);
-  padding: 2px 8px;
-  border-radius: 20px;
+  color: var(--text-primary);
+  border-color: transparent;
+  border-left-color: var(--accent-1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
-.group-actions {
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity var(--transition);
+/* Make active name gradient like greeting */
+.tab-btn.active .tab-name {
+  color: var(--accent-1);
+  font-weight: 600;
 }
 
-.group-header:hover .group-actions {
-  opacity: 1;
+.tab-icon {
+  font-size: 1.15rem;
+  flex-shrink: 0;
 }
 
-.group-collapse-icon {
-  font-size: .8rem;
-  color: var(--text-secondary);
-  transition: transform var(--transition);
-  margin-left: 4px;
+.tab-name {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.group-card.collapsed .group-collapse-icon {
-  transform: rotate(-90deg);
+.tabs-content {
+  padding: 8px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 700px) {
+  .tabs-container {
+    flex-direction: column;
+    min-height: auto;
+  }
+  
+  .tabs-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    min-width: 100%;
+    max-width: none;
+    padding: 12px 16px;
+  }
+  
+  .tabs-nav::-webkit-scrollbar {
+    height: 4px;
+    width: auto;
+  }
+  
+  .tab-btn {
+    padding: 8px 16px;
+    border-left: 1px solid transparent;
+  }
+  
+  .tab-btn.active {
+    border-left-color: transparent;
+    border-bottom: 2px solid var(--accent-1);
+  }
 }
 
 /* 网站网格 */
@@ -391,10 +455,7 @@ body.edit-mode .group-actions {
   gap: 12px;
   padding: 16px;
   transition: all 0.3s ease;
-}
-
-.group-card.collapsed .sites-grid {
-  display: none;
+  animation: fadeIn .3s ease;
 }
 
 /* 单个网站卡片 */

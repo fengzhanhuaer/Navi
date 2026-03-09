@@ -70,7 +70,7 @@ function updateGreeting() {
         [5,  '凌晨好，夜猫子', '🌙'],
         [9,  '早上好！', '☀️'],
         [12, '上午好！', '🌤'],
-        [14, '午好！', '🍱'],
+        [14, '中午好！', '🍱'],
         [18, '下午好！', '🍵'],
         [22, '晚上好！', '🌙'],
         [24, '深夜了，注意休息', '🌛'],
@@ -170,7 +170,7 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// ── 书签渲染（只读，无操作按钮）─────────────────
+// ── 书签渲染（Tab 形式，只读，无操作按钮）─────────────────
 function renderBookmarks() {
     if (!state.groups.length) {
         DOM.bookmarksSection.innerHTML = `
@@ -180,10 +180,34 @@ function renderBookmarks() {
         return;
     }
 
-    DOM.bookmarksSection.innerHTML = state.groups.map(group => {
-        const groupSites = state.sites.filter(s => s.group_id === group.id);
-        const sitesHtml = groupSites.map(site => {
-            // 用户手填 emoji → 直接显示；其他 → 只从服务器缓存读取
+    // Default to the first group if no active tab is selected, or if the active tab is invalid
+    if (state.activeTabId == null || !state.groups.find(g => g.id === state.activeTabId)) {
+        state.activeTabId = state.groups[0].id;
+    }
+
+    // 1. Render Tabs Navigation
+    const tabsNavHtml = `
+      <div class="tabs-nav blur-glass">
+        ${state.groups.map(group => `
+          <button class="tab-btn ${group.id === state.activeTabId ? 'active' : ''}" data-tab-id="${group.id}">
+            <span class="tab-icon">${group.icon || '📁'}</span>
+            <span class="tab-name">${group.name}</span>
+          </button>
+        `).join('')}
+      </div>
+    `;
+
+    // 2. Render Active Tab Content
+    const activeGroupSites = state.sites.filter(s => s.group_id === state.activeTabId);
+    let sitesHtml = '';
+
+    if (activeGroupSites.length === 0) {
+        sitesHtml = `
+          <div style="text-align:center;color:var(--text-muted);padding:40px 0;width:100%;">
+            该分组下还没有书签
+          </div>`;
+    } else {
+        sitesHtml = activeGroupSites.map(site => {
             const isEmoji = site.icon && !site.icon.startsWith('http') && !site.icon.startsWith('/');
             const faviconEl = isEmoji
                 ? site.icon
@@ -193,36 +217,35 @@ function renderBookmarks() {
           <div class="site-favicon">${faviconEl}</div>
           <span class="site-title">${site.title}</span>
         </a>`;
-
         }).join('');
+    }
 
-        return `
-      <div class="group-card ${group.collapsed ? 'collapsed' : ''}" data-group-id="${group.id}">
-        <div class="group-header" data-collapse-gid="${group.id}">
-          <span class="group-icon">${group.icon || '📁'}</span>
-          <span class="group-name">${group.name}</span>
-          <span class="group-count">${groupSites.length}</span>
-          <span class="group-collapse-icon">▾</span>
-        </div>
+    const tabsContentHtml = `
+      <div class="tabs-content">
         <div class="sites-grid">
           ${sitesHtml}
         </div>
-      </div>`;
-    }).join('');
+      </div>
+    `;
 
-    bindCollapseEvents();
+    DOM.bookmarksSection.innerHTML = `
+      <div class="tabs-container">
+        ${tabsNavHtml}
+        ${tabsContentHtml}
+      </div>
+    `;
+
+    bindTabEvents();
 }
 
-function bindCollapseEvents() {
-    DOM.bookmarksSection.querySelectorAll('.group-header').forEach(el => {
-        el.addEventListener('click', async () => {
-            const gid = parseInt(el.dataset.collapseGid);
-            const group = state.groups.find(g => g.id === gid);
-            if (!group) return;
-            group.collapsed = !group.collapsed;
-            const card = el.closest('.group-card');
-            card.classList.toggle('collapsed', group.collapsed);
-            try { await api.groups.update(gid, { name: group.name, icon: group.icon, collapsed: group.collapsed }); } catch { }
+function bindTabEvents() {
+    DOM.bookmarksSection.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const tabId = parseInt(btn.dataset.tabId);
+            if (state.activeTabId !== tabId) {
+                state.activeTabId = tabId;
+                renderBookmarks(); // Re-render to switch tabs
+            }
         });
     });
 }
