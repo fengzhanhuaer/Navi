@@ -1368,7 +1368,7 @@ body.light .auth-card {
   text-decoration: none;
   backdrop-filter: var(--glass);
   transition: all var(--transition);
-  z-index: 100;
+  z-index: 400;
 }
 
 .github-promo:hover {
