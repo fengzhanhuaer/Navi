@@ -1348,4 +1348,41 @@ body.light .auth-card {
   opacity: 0.4;
   background-color: var(--surface-hover);
   border: 1px dashed var(--border-strong);
+}
+
+/* ── GitHub Promo Link ── */
+.github-promo {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 50px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  backdrop-filter: var(--glass);
+  transition: all var(--transition);
+  z-index: 100;
+}
+
+.github-promo:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.github-promo svg {
+  transition: transform var(--transition);
+}
+
+.github-promo:hover svg {
+  transform: scale(1.1);
 }
