@@ -81,7 +81,8 @@ func GetFavicon(c *gin.Context) {
 		c.Status(http.StatusNotFound)
 		return
 	}
-	c.Header("Cache-Control", "public, max-age=604800")
+	// 使用 no-cache：浏览器每次都发条件请求验证，确保远端更新图标后能及时呈现
+	c.Header("Cache-Control", "no-cache")
 	c.File(path)
 }
 
@@ -110,31 +111,40 @@ func FetchAndCacheFavicon(c *gin.Context) {
 	origin := u.Scheme + "://" + u.Host
 	client := newBrowserClient(10 * time.Second)
 
-	// ── 第一优先：DuckDuckGo（国内快速可达）────────────
-	ddgURL := fmt.Sprintf("https://icons.duckduckgo.com/ip3/%s.ico", u.Hostname())
-	if data, err := fetchImage(client, ddgURL); err == nil && len(data) >= 50 {
-		if saveAndRespond(c, path, key, data, ddgURL) { return }
-	}
-
-	// ── 第二优先：解析 HTML 找 <link rel="icon"> ────────
+	// ── 第一优先：解析原始站点 HTML 找 <link rel="icon"> ──
+	// 直接访问源站，获取网站最新更新的图标
 	if iconURL := extractFaviconFromHTML(client, u); iconURL != "" {
 		if data, err := fetchImage(client, iconURL); err == nil && len(data) >= 50 {
-			if saveAndRespond(c, path, key, data, iconURL) { return }
+			if saveAndRespond(c, path, key, data, iconURL) {
+				return
+			}
 		}
 	}
 
-	// ── 第三优先：直接尝试标准路径 ──────────────────────
+	// ── 第二优先：直接尝试标准路径 ──────────────────────
 	for _, suffix := range []string{"/favicon.ico", "/favicon.png", "/apple-touch-icon.png"} {
 		src := origin + suffix
 		if data, err := fetchImage(client, src); err == nil && len(data) >= 50 {
-			if saveAndRespond(c, path, key, data, src) { return }
+			if saveAndRespond(c, path, key, data, src) {
+				return
+			}
+		}
+	}
+
+	// ── 第三优先：DuckDuckGo（可能有缓存延迟，降为第三）──
+	ddgURL := fmt.Sprintf("https://icons.duckduckgo.com/ip3/%s.ico", u.Hostname())
+	if data, err := fetchImage(client, ddgURL); err == nil && len(data) >= 50 {
+		if saveAndRespond(c, path, key, data, ddgURL) {
+			return
 		}
 	}
 
 	// ── 兜底：Google favicon 服务（国外备用）────────────
 	googleURL := fmt.Sprintf("https://www.google.com/s2/favicons?domain=%s&sz=64", u.Hostname())
 	if data, err := fetchImage(client, googleURL); err == nil && len(data) >= 50 {
-		if saveAndRespond(c, path, key, data, googleURL) { return }
+		if saveAndRespond(c, path, key, data, googleURL) {
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"ok": false, "error": "no favicon found for " + u.Hostname()})
@@ -144,19 +154,25 @@ func FetchAndCacheFavicon(c *gin.Context) {
 func extractFaviconFromHTML(client *http.Client, u *url.URL) string {
 	pageURL := u.Scheme + "://" + u.Host + "/"
 	req, err := http.NewRequest("GET", pageURL, nil)
-	if err != nil { return "" }
+	if err != nil {
+		return ""
+	}
 	req.Header.Set("User-Agent", browserUA)
 	req.Header.Set("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8")
 
 	// 使用较短超时，避免阻塞太久
 	htmlClient := newBrowserClient(6 * time.Second)
 	resp, err := htmlClient.Do(req)
-	if err != nil { return "" }
+	if err != nil {
+		return ""
+	}
 	defer resp.Body.Close()
 
 	// 只读前 64KB（favicon link 通常在 <head> 内）
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
-	if err != nil { return "" }
+	if err != nil {
+		return ""
+	}
 	html := string(body)
 
 	// 匹配 <link rel="icon" ...> / <link rel="shortcut icon" ...> / <link rel="apple-touch-icon" ...>
@@ -171,7 +187,9 @@ func extractFaviconFromHTML(client *http.Client, u *url.URL) string {
 	for _, re := range patterns {
 		if m := re.FindStringSubmatch(html); len(m) > 1 {
 			href := strings.TrimSpace(m[1])
-			if href == "" || strings.HasPrefix(href, "data:") { continue }
+			if href == "" || strings.HasPrefix(href, "data:") {
+				continue
+			}
 			// 转为绝对 URL
 			if strings.HasPrefix(href, "//") {
 				return u.Scheme + ":" + href
@@ -201,11 +219,15 @@ func saveAndRespond(c *gin.Context, path, key string, data []byte, src string) b
 
 func fetchImage(client *http.Client, src string) ([]byte, error) {
 	req, err := http.NewRequest("GET", src, nil)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("User-Agent", browserUA)
 	req.Header.Set("Accept", "image/webp,image/apng,image/*,*/*;q=0.8")
 	resp, err := client.Do(req)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("status %d", resp.StatusCode)
@@ -216,7 +238,9 @@ func fetchImage(client *http.Client, src string) ([]byte, error) {
 		return nil, fmt.Errorf("html response, not image")
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	// 简单检查魔数：PNG / ICO / GIF / JPEG / WebP / SVG
 	if len(data) > 4 && !isImageData(data) {
 		return nil, fmt.Errorf("not image data")
@@ -225,24 +249,38 @@ func fetchImage(client *http.Client, src string) ([]byte, error) {
 }
 
 func isImageData(b []byte) bool {
-	if len(b) < 4 { return false }
+	if len(b) < 4 {
+		return false
+	}
 	// PNG: 89 50 4E 47
-	if b[0] == 0x89 && b[1] == 0x50 { return true }
+	if b[0] == 0x89 && b[1] == 0x50 {
+		return true
+	}
 	// JPEG: FF D8
-	if b[0] == 0xFF && b[1] == 0xD8 { return true }
+	if b[0] == 0xFF && b[1] == 0xD8 {
+		return true
+	}
 	// GIF: 47 49 46
-	if b[0] == 0x47 && b[1] == 0x49 && b[2] == 0x46 { return true }
+	if b[0] == 0x47 && b[1] == 0x49 && b[2] == 0x46 {
+		return true
+	}
 	// ICO: 00 00 01 00
-	if b[0] == 0x00 && b[1] == 0x00 && b[2] == 0x01 && b[3] == 0x00 { return true }
+	if b[0] == 0x00 && b[1] == 0x00 && b[2] == 0x01 && b[3] == 0x00 {
+		return true
+	}
 	// WebP: 52 49 46 46 ... 57 45 42 50
-	if b[0] == 0x52 && b[1] == 0x49 { return true }
+	if b[0] == 0x52 && b[1] == 0x49 {
+		return true
+	}
 	// SVG: starts with <svg or <?xml
 	s := strings.ToLower(strings.TrimSpace(string(b[:min(50, len(b))])))
 	return strings.HasPrefix(s, "<svg") || strings.HasPrefix(s, "<?xml")
 }
 
 func min(a, b int) int {
-	if a < b { return a }
+	if a < b {
+		return a
+	}
 	return b
 }
 
