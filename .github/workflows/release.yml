@@ -1,92 +1,178 @@
-# .github/workflows/main.yml
-# 每次推送到 main 分支时，自动构建多平台二进制并发布 GitHub Release 
-
 name: Release
 
 on:
   push:
-    branches:
-      - main
-    paths-ignore:
-      - '**.md'
-      - '.gitignore'
+    branches: [main]
+    tags:     ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '手动发布的 tag（如 v1.2.3）'
+        required: false
+        type: string
 
 permissions:
   contents: write
+  actions:  write
 
 jobs:
-  build-and-release:
-    name: Build & Release
+  # ════════════════════════════════════════════════════════════
+  # 1. 前置步骤：文本检查与版本推导
+  # ════════════════════════════════════════════════════════════
+  check:
+    name: ✅ check & determine-version
     runs-on: ubuntu-latest
-
+    outputs:
+      tag_name: ${{ steps.version.outputs.tag_name }}
+      is_release: ${{ steps.version.outputs.is_release }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
-      - name: Get latest tag & bump patch
-        id: bump
+      - name: Determine Version
+        id: version
         run: |
-          LATEST=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-          if [ -z "$LATEST" ]; then
-            NEW_TAG="v0.1.0"
+          # 1. 尝试从输入、或触发的 Tag 计算基础名称
+          INPUT_TAG="${{ inputs.tag }}"
+          REF_TAG="${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}"
+          BASE_TAG="${INPUT_TAG:-$REF_TAG}"
+
+          # 2. 如果是正常的 Push Main 计算出一个假定的新号，用于内嵌构建
+          if [[ -z "$BASE_TAG" && "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            current="$(tr -d ' \t\r\n' < VERSION)"
+            current="${current#v}"
+            IFS='.' read -r major minor patch <<< "$current"
+            patch=$((patch + 1))
+            BASE_TAG="v${major}.${minor}.${patch}"
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+          elif [[ -n "$BASE_TAG" ]]; then
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
           else
-            VERSION="${LATEST#v}"
-            MAJOR=$(echo "$VERSION" | cut -d. -f1)
-            MINOR=$(echo "$VERSION" | cut -d. -f2)
-            PATCH=$(echo "$VERSION" | cut -d. -f3)
-            PATCH=$((PATCH + 1))
-            NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+            BASE_TAG="dev-${{ github.sha }}"
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
-          echo "VERSION=$NEW_TAG" >> $GITHUB_ENV
 
-      - name: Create & push tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "$NEW_TAG" -m "Auto release $NEW_TAG"
-          git push origin "$NEW_TAG"
+          echo "Determined Version: $BASE_TAG"
+          echo "tag_name=$BASE_TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+  # ════════════════════════════════════════════════════════════
+  # 2. 并行阶段：构建各个平台的 Navi
+  # ════════════════════════════════════════════════════════════
+  build:
+    name: 🔨 build / ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    needs: [check]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            ext: ''
+            artifact_name: 'navi-linux-amd64'
+          - goos: linux
+            goarch: arm64
+            ext: ''
+            artifact_name: 'navi-linux-arm64'
+          - goos: windows
+            goarch: amd64
+            ext: '.exe'
+            artifact_name: 'navi-windows-amd64.exe'
+          - goos: darwin
+            goarch: amd64
+            ext: ''
+            artifact_name: 'navi-darwin-amd64'
+          - goos: darwin
+            goarch: arm64
+            ext: ''
+            artifact_name: 'navi-darwin-arm64'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
+          cache-dependency-path: go.sum
 
       - name: Download dependencies
         run: |
           go version
           go mod tidy
 
-      - name: Build all platforms
+      - name: Build Navi
+        env:
+          CGO_ENABLED: '0'
+          GOOS:        ${{ matrix.goos }}
+          GOARCH:      ${{ matrix.goarch }}
+          TAG_NAME:    ${{ needs.check.outputs.tag_name }}
         run: |
           mkdir -p dist
-          
-          echo "Building linux/amd64..."
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${VERSION}" -o dist/navi-linux-amd64 .
-          
-          echo "Building linux/arm64..."
-          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.Version=${VERSION}" -o dist/navi-linux-arm64 .
-          
-          echo "Building windows/amd64..."
-          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${VERSION}" -o dist/navi-windows-amd64.exe .
-          
-          echo "Building darwin/amd64..."
-          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${VERSION}" -o dist/navi-darwin-amd64 .
-          
-          echo "Building darwin/arm64 (Apple Silicon)..."
-          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X main.Version=${VERSION}" -o dist/navi-darwin-arm64 .
-          
+          BIN="dist/${{ matrix.artifact_name }}"
+          LDFLAGS="-s -w -X main.Version=${TAG_NAME}"
+          go build -trimpath -ldflags "$LDFLAGS" -o "$BIN" .
           ls -lh dist/
 
-      - name: Create GitHub Release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/*
+          if-no-files-found: error
+
+  # ════════════════════════════════════════════════════════════
+  # 3. 发布阶段：汇聚所有并行产物，改写版本号并创建 Release
+  # ════════════════════════════════════════════════════════════
+  release:
+    name: 🚀 publish release
+    runs-on: ubuntu-latest
+    needs: [check, build]
+    if: needs.check.outputs.is_release == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Setup Target Tag and Version Bump
+        id: publisher
+        run: |
+          TAG="${{ needs.check.outputs.tag_name }}"
+          echo "Target Tag: $TAG"
+
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            # 更新 VERSION 文件并提交
+            NEXT="${TAG#v}"
+            echo "$NEXT" > VERSION
+
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add VERSION
+
+            if ! git diff --cached --quiet; then
+               # Push main but don't re-trigger actions locally
+               git commit -m "chore: bump VERSION to ${NEXT} [skip ci]"
+               git push origin HEAD:main
+            fi
+
+            # 打上本次的发版 Tag
+            if ! git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}$"; then
+              git tag -a "${TAG}" -m "Release ${TAG}"
+              git push origin "${TAG}"
+            fi
+          fi
+
+      - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.NEW_TAG }}
-          name: "Navi ${{ env.NEW_TAG }}"
+          tag_name:              ${{ needs.check.outputs.tag_name }}
+          name:                  "Navi ${{ needs.check.outputs.tag_name }}"
           body: |
-            ## 🧭 Navi ${{ env.NEW_TAG }}
+            ## 🧭 Navi ${{ needs.check.outputs.tag_name }}
 
             单文件可执行程序，内嵌前端，下载即用。
 
@@ -101,14 +187,7 @@ jobs:
             | macOS Apple Silicon | `navi-darwin-arm64` |
 
             ### ⭐ Linux 一键安装
-            \`\`\`bash
-            curl -fsSL https://raw.githubusercontent.com/fengzhanhuaer/Navi/main/scripts/install.sh | sudo bash
-            \`\`\`
-          files: |
-            dist/navi-linux-amd64
-            dist/navi-linux-arm64
-            dist/navi-windows-amd64.exe
-            dist/navi-darwin-amd64
-            dist/navi-darwin-arm64
-          draft: false
-          prerelease: false
+            `curl -fsSL https://raw.githubusercontent.com/fengzhanhuaer/Navi/main/scripts/install.sh | sudo bash`
+          generate_release_notes: false
+          overwrite_files:       true
+          files:                 dist/*

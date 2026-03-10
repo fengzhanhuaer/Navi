@@ -143,8 +143,9 @@ func ConfigureD1(d1 *db.D1HTTPClient) gin.HandlerFunc {
 }
 
 // UpgradeSystem 从 GitHub 拉取最新 release 并覆盖本地二进制文件
-func UpgradeSystem(c *gin.Context) {
-	// 由于这只是个个人项目示例，此处硬编码仓库所有者和名称。
+func UpgradeSystem(currentVersion string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 由于这只是个个人项目示例，此处硬编码仓库所有者和名称。
 	// 实际开发中应该让用户或系统变量配置。
 	repoOwner := "fengzhanhuaer"
 	repoName := "Navi"
@@ -161,9 +162,25 @@ func UpgradeSystem(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "在仓库中没有找到任何发布版本"})
 		return
 	}
-	release := releases[0]
+		release := releases[0]
+		
+		remoteTag := *release.TagName
+		// 统一处理可能存在的 'v' 前缀
+		localV := currentVersion
+		if !strings.HasPrefix(localV, "v") {
+			localV = "v" + localV
+		}
+		if !strings.HasPrefix(remoteTag, "v") {
+			remoteTag = "v" + remoteTag
+		}
 
-	// 查找匹配当前系统架构的资产文件
+		// 检查版本是否一致
+		if localV == remoteTag {
+			c.JSON(http.StatusOK, gin.H{"ok": true, "log": fmt.Sprintf("当前已是最新版本 %s，无需升级。", currentVersion)})
+			return
+		}
+
+		// 查找匹配当前系统架构的资产文件
 	var assetURL string
 	targetSuffix := fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH) // ex: windows-amd64
 	
@@ -278,5 +295,6 @@ func UpgradeSystem(c *gin.Context) {
 			}
 		}
 	}()
+	}
 }
 

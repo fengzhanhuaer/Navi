@@ -179,7 +179,7 @@ func main() {
 
 		api.GET("/settings", handlers.GetSettings)
 		api.PUT("/settings/:key", handlers.SetSetting)
-		api.POST("/settings/upgrade", handlers.UpgradeSystem)
+		api.POST("/settings/upgrade", handlers.UpgradeSystem(Version))
 
 		api.POST("/sync/push", handlers.SyncToD1(d1))
 		api.POST("/sync/restore", handlers.RestoreFromD1(d1))
