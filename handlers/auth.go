@@ -6,6 +6,8 @@ package handlers
 import (
 	"net/http"
 	"os"
+	"strings"
+	"sync"
 	"time"
 
 	"navi/db"
@@ -14,6 +16,62 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// ─── IP 登录失败限流 ───────────────────────────
+const (
+	maxFailAttempts = 5                // 最大失败次数（窗口内）
+	failWindow      = 15 * time.Minute // 失败计数窗口
+	blockDuration   = 24 * time.Hour   // 封锁时长：1 天
+)
+
+type ipRecord struct {
+	count        int
+	firstFail    time.Time
+	blockedUntil time.Time
+}
+
+var loginAttempts sync.Map // map[string]*ipRecord
+
+// getClientIP 从 X-Forwarded-For 或 RemoteAddr 解析真实 IP
+func getClientIP(c *gin.Context) string {
+	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
+		parts := strings.SplitN(xff, ",", 2)
+		return strings.TrimSpace(parts[0])
+	}
+	return c.ClientIP()
+}
+
+// isBlocked 检查 IP 是否仍在封锁期内
+func isBlocked(ip string) bool {
+	v, ok := loginAttempts.Load(ip)
+	if !ok {
+		return false
+	}
+	rec := v.(*ipRecord)
+	return time.Now().Before(rec.blockedUntil)
+}
+
+// recordFailure 记录 IP 的一次失败，超过阈值则封锁
+func recordFailure(ip string) {
+	now := time.Now()
+	v, _ := loginAttempts.LoadOrStore(ip, &ipRecord{firstFail: now})
+	rec := v.(*ipRecord)
+
+	// 超出窗口则重置
+	if now.Sub(rec.firstFail) > failWindow {
+		rec.count = 0
+		rec.firstFail = now
+	}
+	rec.count++
+	if rec.count >= maxFailAttempts {
+		rec.blockedUntil = now.Add(blockDuration)
+	}
+}
+
+// resetAttempts 登录成功后清除 IP 记录
+func resetAttempts(ip string) {
+	loginAttempts.Delete(ip)
+}
 
 // jwtSecret 从环境变量读取，启动时由 main 保证已设置
 func jwtSecret() []byte {
@@ -78,6 +136,14 @@ func Register(c *gin.Context) {
 // ─────────────────────────────────────────────
 
 func Login(c *gin.Context) {
+	ip := getClientIP(c)
+
+	// 检查 IP 是否被封锁
+	if isBlocked(ip) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "登录失败次数过多，IP 已被封锁 1 天，请稍后再试"})
+		return
+	}
+
 	var body struct {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
@@ -89,14 +155,19 @@ func Login(c *gin.Context) {
 
 	user, err := db.GetUserByUsername(body.Username)
 	if err != nil {
+		recordFailure(ip)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(body.Password)); err != nil {
+		recordFailure(ip)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
 		return
 	}
+
+	// 登录成功，清除失败记录
+	resetAttempts(ip)
 
 	token, err := makeToken(user.Username)
 	if err != nil {

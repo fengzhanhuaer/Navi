@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -118,8 +118,11 @@
           <span class="setting-label">当前版本</span>
           <p style="font-size:.8rem;color:var(--text-muted);margin-top:4px;" id="currentVersion">加载中...</p>
         </div>
-        <div class="setting-value">
+        <div class="setting-value" style="display: flex; gap: 8px; align-items: center;">
           <button class="btn-primary" id="btnUpgrade">检查并升级</button>
+          <a href="https://github.com/fengzhanhuaer/Navi" target="_blank" class="btn-secondary" style="text-decoration:none; padding:6px 12px; font-size:.85rem;">
+            🔗 GitHub 项目
+          </a>
         </div>
       </div>
       <div id="upgradeLog" class="settings-logs hidden" style="margin-top:12px;"></div>
