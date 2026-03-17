@@ -137,7 +137,7 @@ function bindEvents() {
                 if (img) img.src = `/api/favicon?url=${encodeURIComponent(siteUrl)}&t=${Date.now()}`;
                 toast('图标已更新', 'success');
             } else {
-                toast('图标获取失败（可能是 CORS 限制或网站无图标）', 'info', 4000);
+                toast('图标获取失败，请检查服务端网络连接或该网站是否有图标', 'info', 4000);
             }
             btn.textContent = '🔄';
             btn.disabled = false;

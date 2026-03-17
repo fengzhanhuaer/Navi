@@ -70,23 +70,103 @@ func newBrowserClient(timeout time.Duration) *http.Client {
 const browserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
 // ── GET /api/favicon?url=<site_url> ──────────────────────
+// 懒加载代理：缓存命中直接返回；未命中时自动抓取后返回，全部失败则 404
 func GetFavicon(c *gin.Context) {
 	siteURL := strings.TrimSpace(c.Query("url"))
 	if siteURL == "" {
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	path := cachePath(domainKey(siteURL))
-	if _, err := os.Stat(path); err != nil {
-		c.Status(http.StatusNotFound)
+
+	u, err := url.Parse(siteURL)
+	if err != nil || u.Host == "" {
+		u, _ = url.Parse("https://" + siteURL)
+	}
+	if u == nil || u.Host == "" {
+		c.Status(http.StatusBadRequest)
 		return
 	}
-	// 使用 no-cache：浏览器每次都发条件请求验证，确保远端更新图标后能及时呈现
-	c.Header("Cache-Control", "no-cache")
-	c.File(path)
+	if u.Scheme == "" {
+		u.Scheme = "https"
+	}
+
+	key := domainKey(siteURL)
+	path := cachePath(key)
+
+	// 缓存命中，直接返回
+	if _, err := os.Stat(path); err == nil {
+		c.Header("Cache-Control", "no-cache")
+		c.File(path)
+		return
+	}
+
+	// 缓存未命中，自动抓取
+	if src, ok := doFetchAndCache(key, path, u); ok {
+		log.Printf("[ICON] Auto-fetched: %s via %s", key, src)
+		c.Header("Cache-Control", "no-cache")
+		c.File(path)
+		return
+	}
+
+	c.Status(http.StatusNotFound)
+}
+
+// doFetchAndCache 执行多源降级抓取并写入缓存文件
+// 成功返回 (来源URL, true)，失败返回 ("", false)
+func doFetchAndCache(key, path string, u *url.URL) (string, bool) {
+	origin := u.Scheme + "://" + u.Host
+	client := newBrowserClient(10 * time.Second)
+
+	type candidate struct {
+		url string
+		data []byte
+	}
+
+	tryFetch := func(src string) *candidate {
+		data, err := fetchImage(client, src)
+		if err == nil && len(data) >= 50 {
+			return &candidate{src, data}
+		}
+		return nil
+	}
+
+	// 1. 解析 HTML 中的 <link rel="icon">
+	if iconURL := extractFaviconFromHTML(client, u); iconURL != "" {
+		if c := tryFetch(iconURL); c != nil {
+			if err := os.WriteFile(path, c.data, 0644); err == nil {
+				return c.url, true
+			}
+		}
+	}
+
+	// 2. 标准路径
+	for _, suffix := range []string{"/favicon.ico", "/favicon.png", "/apple-touch-icon.png"} {
+		if c := tryFetch(origin + suffix); c != nil {
+			if err := os.WriteFile(path, c.data, 0644); err == nil {
+				return c.url, true
+			}
+		}
+	}
+
+	// 3. DuckDuckGo
+	if c := tryFetch(fmt.Sprintf("https://icons.duckduckgo.com/ip3/%s.ico", u.Hostname())); c != nil {
+		if err := os.WriteFile(path, c.data, 0644); err == nil {
+			return c.url, true
+		}
+	}
+
+	// 4. Google（兜底）
+	if c := tryFetch(fmt.Sprintf("https://www.google.com/s2/favicons?domain=%s&sz=64", u.Hostname())); c != nil {
+		if err := os.WriteFile(path, c.data, 0644); err == nil {
+			return c.url, true
+		}
+	}
+
+	return "", false
 }
 
 // ── POST /api/favicon/fetch?url=<site_url> ───────────────
+// 强制重新抓取（忽略现有缓存），用于「🔄」刷新按钮
 func FetchAndCacheFavicon(c *gin.Context) {
 	siteURL := strings.TrimSpace(c.Query("url"))
 	if siteURL == "" {
@@ -108,43 +188,14 @@ func FetchAndCacheFavicon(c *gin.Context) {
 
 	key := domainKey(siteURL)
 	path := cachePath(key)
-	origin := u.Scheme + "://" + u.Host
-	client := newBrowserClient(10 * time.Second)
 
-	// ── 第一优先：解析原始站点 HTML 找 <link rel="icon"> ──
-	// 直接访问源站，获取网站最新更新的图标
-	if iconURL := extractFaviconFromHTML(client, u); iconURL != "" {
-		if data, err := fetchImage(client, iconURL); err == nil && len(data) >= 50 {
-			if saveAndRespond(c, path, key, data, iconURL) {
-				return
-			}
-		}
-	}
+	// 强制删除旧缓存，重新抓取
+	os.Remove(path)
 
-	// ── 第二优先：直接尝试标准路径 ──────────────────────
-	for _, suffix := range []string{"/favicon.ico", "/favicon.png", "/apple-touch-icon.png"} {
-		src := origin + suffix
-		if data, err := fetchImage(client, src); err == nil && len(data) >= 50 {
-			if saveAndRespond(c, path, key, data, src) {
-				return
-			}
-		}
-	}
-
-	// ── 第三优先：DuckDuckGo（可能有缓存延迟，降为第三）──
-	ddgURL := fmt.Sprintf("https://icons.duckduckgo.com/ip3/%s.ico", u.Hostname())
-	if data, err := fetchImage(client, ddgURL); err == nil && len(data) >= 50 {
-		if saveAndRespond(c, path, key, data, ddgURL) {
-			return
-		}
-	}
-
-	// ── 兜底：Google favicon 服务（国外备用）────────────
-	googleURL := fmt.Sprintf("https://www.google.com/s2/favicons?domain=%s&sz=64", u.Hostname())
-	if data, err := fetchImage(client, googleURL); err == nil && len(data) >= 50 {
-		if saveAndRespond(c, path, key, data, googleURL) {
-			return
-		}
+	if src, ok := doFetchAndCache(key, path, u); ok {
+		log.Printf("[ICON] Force-refreshed: %s via %s", key, src)
+		c.JSON(http.StatusOK, gin.H{"ok": true, "source": src})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"ok": false, "error": "no favicon found for " + u.Hostname()})
@@ -207,15 +258,6 @@ func extractFaviconFromHTML(client *http.Client, u *url.URL) string {
 	return ""
 }
 
-func saveAndRespond(c *gin.Context, path, key string, data []byte, src string) bool {
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "write cache: " + err.Error()})
-		return true
-	}
-	log.Printf("[ICON] Cached: %s via %s (%d bytes)", key, src, len(data))
-	c.JSON(http.StatusOK, gin.H{"ok": true, "source": src})
-	return true
-}
 
 func fetchImage(client *http.Client, src string) ([]byte, error) {
 	req, err := http.NewRequest("GET", src, nil)
