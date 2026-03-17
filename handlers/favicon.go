@@ -95,7 +95,7 @@ func GetFavicon(c *gin.Context) {
 
 	// 缓存命中，直接返回
 	if _, err := os.Stat(path); err == nil {
-		c.Header("Cache-Control", "no-cache")
+		c.Header("Cache-Control", "no-store")
 		c.File(path)
 		return
 	}
@@ -103,7 +103,7 @@ func GetFavicon(c *gin.Context) {
 	// 缓存未命中，自动抓取
 	if src, ok := doFetchAndCache(key, path, u); ok {
 		log.Printf("[ICON] Auto-fetched: %s via %s", key, src)
-		c.Header("Cache-Control", "no-cache")
+		c.Header("Cache-Control", "no-store")
 		c.File(path)
 		return
 	}
